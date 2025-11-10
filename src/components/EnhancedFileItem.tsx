@@ -1,46 +1,73 @@
-import { useState } from "react";
-import { Download, FileImage, FileText, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, FileImage, FileText, Loader2, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { compressImage, formatFileSize, calculateCompressionRatio } from "@/utils/imageCompression";
+import { compressImageWithWorker, formatFileSize, calculateCompressionRatio } from "@/utils/compressionWorker";
 import { compressPDF } from "@/utils/pdfCompression";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
 
-interface FileItemProps {
+interface EnhancedFileItemProps {
   file: File;
+  quality: 'low' | 'medium' | 'high';
+  format: 'auto' | 'jpeg' | 'webp' | 'png';
+  onRemove: () => void;
+  onCompressed: (blob: Blob) => void;
 }
 
-const FileItem = ({ file }: FileItemProps) => {
+const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: EnhancedFileItemProps) => {
   const [compressing, setCompressing] = useState(false);
   const [compressed, setCompressed] = useState(false);
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const [originalSize] = useState(file.size);
   const [compressedSize, setCompressedSize] = useState<number>(0);
+  const [thumbnail, setThumbnail] = useState<string>("");
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
   const isImage = file.type.startsWith("image/");
   const isPDF = file.type === "application/pdf";
 
+  // Generate thumbnail for images
+  useEffect(() => {
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setThumbnail(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [file, isImage]);
+
   const handleCompress = async () => {
     setCompressing(true);
+    setProgress(0);
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => Math.min(prev + 10, 90));
+    }, 100);
+
     try {
       let blob: Blob;
       
       if (isImage) {
-        blob = await compressImage(file, {
-          quality: 75,
-          maxWidth: 1920,
-          maxHeight: 1920,
-        });
+        const result = await compressImageWithWorker(file, { quality, format });
+        blob = result.blob;
+        setCompressedSize(result.compressedSize);
       } else if (isPDF) {
         blob = await compressPDF(file);
+        setCompressedSize(blob.size);
       } else {
         throw new Error("Unsupported file type");
       }
 
+      clearInterval(progressInterval);
+      setProgress(100);
+
       setCompressedBlob(blob);
-      setCompressedSize(blob.size);
       setCompressed(true);
+      onCompressed(blob);
 
       const ratio = calculateCompressionRatio(originalSize, blob.size);
       toast({
@@ -48,6 +75,7 @@ const FileItem = ({ file }: FileItemProps) => {
         description: `Reduced file size by ${ratio}%`,
       });
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Compression error:", error);
       toast({
         title: "Compression failed",
@@ -77,17 +105,34 @@ const FileItem = ({ file }: FileItemProps) => {
     : 0;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 shadow-card transition-smooth hover:shadow-elegant">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="bg-card border border-border rounded-xl p-4 shadow-card transition-smooth hover:shadow-elegant relative"
+    >
+      {/* Remove button */}
+      <button
+        onClick={onRemove}
+        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center transition-smooth group"
+        aria-label="Remove file"
+      >
+        <X className="w-4 h-4 text-destructive group-hover:scale-110 transition-transform" />
+      </button>
+
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-          {isImage ? (
-            <FileImage className="w-6 h-6 text-primary" />
+        {/* Thumbnail or icon */}
+        <div className="w-16 h-16 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0 overflow-hidden">
+          {thumbnail ? (
+            <img src={thumbnail} alt={file.name} className="w-full h-full object-cover" />
+          ) : isImage ? (
+            <FileImage className="w-8 h-8 text-primary" />
           ) : (
-            <FileText className="w-6 h-6 text-primary" />
+            <FileText className="w-8 h-8 text-primary" />
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-8">
           <h4 className="text-sm font-semibold text-foreground truncate mb-1">
             {file.name}
           </h4>
@@ -96,7 +141,8 @@ const FileItem = ({ file }: FileItemProps) => {
             {compressed && (
               <>
                 <span>→</span>
-                <span className="text-primary font-medium">
+                <span className="text-primary font-medium flex items-center gap-1">
+                  <Check className="w-3 h-3" />
                   {formatFileSize(compressedSize)} ({compressionRatio}% smaller)
                 </span>
               </>
@@ -105,8 +151,8 @@ const FileItem = ({ file }: FileItemProps) => {
 
           {compressing && (
             <div className="mb-3">
-              <Progress value={50} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-2">Compressing...</p>
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-2">Compressing... {progress}%</p>
             </div>
           )}
 
@@ -142,8 +188,8 @@ const FileItem = ({ file }: FileItemProps) => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
-export default FileItem;
+export default EnhancedFileItem;

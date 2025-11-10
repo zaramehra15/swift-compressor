@@ -1,0 +1,65 @@
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { estimateCompressedSize, formatFileSize } from "@/utils/compressionWorker";
+
+interface QualitySelectorProps {
+  quality: 'low' | 'medium' | 'high';
+  onQualityChange: (quality: 'low' | 'medium' | 'high') => void;
+  totalSize?: number;
+}
+
+const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelectorProps) => {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-base font-semibold">Compression Quality</Label>
+        <p className="text-sm text-muted-foreground mt-1">
+          Choose between file size and image quality
+        </p>
+      </div>
+
+      <RadioGroup value={quality} onValueChange={(val) => onQualityChange(val as any)}>
+        <div className="flex items-center space-x-3 p-4 rounded-xl border-2 border-border hover:border-primary transition-smooth cursor-pointer">
+          <RadioGroupItem value="high" id="high" />
+          <div className="flex-1">
+            <Label htmlFor="high" className="cursor-pointer font-medium">
+              High Quality
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Best quality, ~30% smaller
+              {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'high'))})`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3 p-4 rounded-xl border-2 border-primary bg-primary/5 transition-smooth cursor-pointer">
+          <RadioGroupItem value="medium" id="medium" />
+          <div className="flex-1">
+            <Label htmlFor="medium" className="cursor-pointer font-medium">
+              Medium Quality (Recommended)
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Balanced, ~50% smaller
+              {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'medium'))})`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3 p-4 rounded-xl border-2 border-border hover:border-primary transition-smooth cursor-pointer">
+          <RadioGroupItem value="low" id="low" />
+          <div className="flex-1">
+            <Label htmlFor="low" className="cursor-pointer font-medium">
+              Low Quality
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Maximum compression, ~70% smaller
+              {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'low'))})`}
+            </p>
+          </div>
+        </div>
+      </RadioGroup>
+    </div>
+  );
+};
+
+export default QualitySelector;
