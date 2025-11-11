@@ -1,8 +1,8 @@
-# Compress - Deployment Guide
+# Finvestech Tools - Deployment Guide
 
 ## 📦 Project Overview
 
-Compress is a browser-based image and PDF compression tool built with React, TypeScript, and Tailwind CSS. All file processing happens locally in the user's browser - no uploads, no server processing.
+Finvestech Tools is a comprehensive browser-based file processing suite with Compress, Convert, and Resize tools. All processing happens locally - no uploads, complete privacy.
 
 **Live URL:** https://compress.finvestech.in
 
@@ -136,21 +136,24 @@ All styles are defined in `src/index.css` using CSS variables:
 
 ---
 
-## 🌐 Custom Domain Setup
+## 🌐 Custom Domain Setup (Hostinger)
 
 To connect `compress.finvestech.in`:
 
 ### In Vercel:
 1. Go to Project Settings → Domains
 2. Add `compress.finvestech.in`
-3. Vercel will provide DNS records
+3. Copy the CNAME target (e.g., `cname.vercel-dns.com`)
 
-### In Your DNS Provider:
-Add a CNAME record:
-- **Type:** CNAME
-- **Name:** compress
-- **Value:** cname.vercel-dns.com
-- **TTL:** 3600
+### In Hostinger DNS:
+1. Log into Hostinger → Domain Management
+2. Select `finvestech.in` → DNS / Name Servers
+3. Add CNAME record:
+   - **Type:** CNAME
+   - **Name:** compress
+   - **Points to:** cname.vercel-dns.com
+   - **TTL:** 14400 (4 hours)
+4. Save and wait 15-30 minutes for propagation
 
 ---
 
