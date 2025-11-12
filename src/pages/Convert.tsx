@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Helmet } from "react-helmet";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ConversionSelector from "@/components/ConversionSelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Image, 
+  Image as ImageIcon, 
   FileText, 
   Music, 
   Video, 
@@ -19,7 +20,10 @@ import { motion } from "framer-motion";
 
 const Convert = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [fromFormat, setFromFormat] = useState<string>("");
+  const [toFormat, setToFormat] = useState<string>("");
   const [files, setFiles] = useState<File[]>([]);
+  const [convertedFiles, setConvertedFiles] = useState<Map<string, Blob>>(new Map());
   const [converting, setConverting] = useState(false);
   const { toast } = useToast();
 
@@ -27,7 +31,7 @@ const Convert = () => {
     {
       id: "images",
       name: "Images",
-      icon: Image,
+      icon: ImageIcon,
       formats: ["JPG", "PNG", "WEBP", "GIF", "HEIC"],
       description: "Convert between image formats"
     },
@@ -65,15 +69,109 @@ const Convert = () => {
   };
 
   const handleConvert = async () => {
+    if (!fromFormat || !toFormat) {
+      toast({
+        title: "Select formats",
+        description: "Please select both source and target formats.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setConverting(true);
-    // Simulate conversion
-    setTimeout(() => {
+    const newConvertedFiles: Map<string, Blob> = new Map();
+
+    try {
+      for (const file of files) {
+        // Basic image conversion using canvas
+        if (selectedCategory === "images") {
+          const converted = await convertImage(file, toFormat.toLowerCase());
+          newConvertedFiles.set(file.name, converted);
+        } else {
+          // For documents, audio, video - show message
+          toast({
+            title: "Conversion Limited",
+            description: `${selectedCategory} conversion requires advanced processing. Image conversion is fully supported.`,
+            variant: "destructive",
+          });
+        }
+      }
+
+      setConvertedFiles(newConvertedFiles);
+      setConverting(false);
+      
+      if (newConvertedFiles.size > 0) {
+        toast({
+          title: "Conversion Complete!",
+          description: `Successfully converted ${newConvertedFiles.size} file(s).`,
+        });
+      }
+    } catch (error) {
       setConverting(false);
       toast({
-        title: "Conversion Complete!",
-        description: "Your files have been converted successfully.",
+        title: "Conversion Failed",
+        description: "An error occurred during conversion.",
+        variant: "destructive",
       });
-    }, 2000);
+    }
+  };
+
+  const convertImage = async (file: File, format: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          
+          if (!ctx) {
+            reject(new Error("Failed to get canvas context"));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0);
+
+          const mimeType = format === "jpg" ? "image/jpeg" : 
+                          format === "png" ? "image/png" :
+                          format === "webp" ? "image/webp" : "image/jpeg";
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error("Conversion failed"));
+              }
+            },
+            mimeType,
+            0.9
+          );
+        };
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleDownload = (fileName: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const extension = toFormat.toLowerCase() === "jpg" ? "jpg" : toFormat.toLowerCase();
+    a.download = `converted_${fileName.split('.')[0]}.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Downloaded!",
+      description: `${fileName} has been downloaded.`,
+    });
   };
 
   return (
@@ -199,6 +297,17 @@ const Convert = () => {
                     Convert {categories.find(c => c.id === selectedCategory)?.name}
                   </h2>
 
+                  {/* Conversion Format Selector */}
+                  <div className="mb-6">
+                    <ConversionSelector
+                      category={selectedCategory}
+                      fromFormat={fromFormat}
+                      toFormat={toFormat}
+                      onFromFormatChange={setFromFormat}
+                      onToFormatChange={setToFormat}
+                    />
+                  </div>
+
                   {/* File Upload */}
                   {files.length === 0 && (
                     <div className="border-2 border-dashed border-border rounded-xl p-12 text-center hover:border-primary transition-smooth cursor-pointer">
@@ -227,31 +336,49 @@ const Convert = () => {
                   {/* File List */}
                   {files.length > 0 && (
                     <div className="space-y-4">
-                      {files.map((file, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-4 p-4 bg-secondary/50 rounded-xl"
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-foreground">{file.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveFile(index)}
+                      {files.map((file, index) => {
+                        const converted = convertedFiles.get(file.name);
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center gap-4 p-4 bg-secondary/50 rounded-xl"
                           >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                            <div className="flex-1">
+                              <p className="font-medium text-foreground">{file.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                                {converted && (
+                                  <span className="ml-2 text-primary">
+                                    → {(converted.size / 1024 / 1024).toFixed(2)} MB
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            {converted && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownload(file.name, converted)}
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveFile(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
 
                       <div className="flex gap-3 pt-4">
                         <Button
                           onClick={handleConvert}
-                          disabled={converting}
+                          disabled={converting || !fromFormat || !toFormat || convertedFiles.size > 0}
                           className="flex-1"
                         >
                           {converting ? (
@@ -263,6 +390,18 @@ const Convert = () => {
                             "Convert Files"
                           )}
                         </Button>
+                        {convertedFiles.size > 0 && (
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setFiles([]);
+                              setConvertedFiles(new Map());
+                            }}
+                            className="flex-1"
+                          >
+                            Convert New Files
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}

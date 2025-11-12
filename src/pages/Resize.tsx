@@ -21,11 +21,12 @@ const Resize = () => {
   const imgRef = useRef<HTMLImageElement>(null);
 
   const presets = [
-    { name: "WhatsApp", width: 1080, height: 1080 },
     { name: "Instagram Post", width: 1080, height: 1080 },
     { name: "Instagram Story", width: 1080, height: 1920 },
+    { name: "YouTube Thumbnail", width: 1280, height: 720 },
+    { name: "WhatsApp", width: 1080, height: 1080 },
     { name: "Email", width: 600, height: 400 },
-    { name: "HD", width: 1920, height: 1080 },
+    { name: "HD (1080p)", width: 1920, height: 1080 },
   ];
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,21 +82,34 @@ const Resize = () => {
       canvas.height = height;
       ctx?.drawImage(img, 0, 0, width, height);
 
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `resized_${file.name}`;
-          a.click();
-          URL.revokeObjectURL(url);
+      // Determine output format and quality
+      const outputMimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
+      const quality = 0.85; // Good balance between quality and file size
 
-          toast({
-            title: "Image Resized!",
-            description: `Downloaded as ${width}x${height}px`,
-          });
-        }
-      }, file.type);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            
+            // Preserve original extension or use jpg for jpeg
+            const extension = file.type === "image/png" ? "png" : "jpg";
+            const baseName = file.name.split(".")[0];
+            a.download = `resized_${baseName}.${extension}`;
+            
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast({
+              title: "Image Resized!",
+              description: `Downloaded as ${width}x${height}px (${(blob.size / 1024 / 1024).toFixed(2)} MB)`,
+            });
+          }
+        },
+        outputMimeType,
+        quality
+      );
     };
 
     img.src = preview;
