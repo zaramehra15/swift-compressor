@@ -57,7 +57,7 @@ const FileUpload = ({ onFilesSelected, acceptedTypes = "image/*,.pdf" }: FileUpl
     <div
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className="border-2 border-dashed border-border rounded-2xl p-12 text-center transition-smooth hover:border-primary hover:bg-secondary/50 cursor-pointer"
+      className="border-2 border-dashed border-border rounded-2xl p-12 text-center transition-smooth hover:border-primary hover:bg-primary/5 hover:scale-[1.01] cursor-pointer group"
     >
       <input
         type="file"
@@ -71,15 +71,20 @@ const FileUpload = ({ onFilesSelected, acceptedTypes = "image/*,.pdf" }: FileUpl
         htmlFor="file-upload"
         className="cursor-pointer flex flex-col items-center gap-4"
       >
-        <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-          <Upload className="w-8 h-8 text-primary" />
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+          <Upload className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
         </div>
         <div>
           <p className="text-lg font-semibold text-foreground mb-2">
-            Drop files here or click to browse
+            Drop your files here or click to browse
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mb-3">
             Supports JPG, PNG, WebP, and PDF files
+          </p>
+          <p className="text-xs text-muted-foreground px-4">
+            <span className="inline-flex items-center gap-1">
+              🔒 Your files never leave your device — all compression happens locally in your browser
+            </span>
           </p>
         </div>
       </label>

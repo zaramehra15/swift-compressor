@@ -8,7 +8,6 @@ import EnhancedFileItem from "@/components/EnhancedFileItem";
 import QualitySelector from "@/components/QualitySelector";
 import FormatSelector from "@/components/FormatSelector";
 import FAQSection from "@/components/FAQSection";
-import SampleFiles from "@/components/SampleFiles";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Zap, Lock, Download, Gift } from "lucide-react";
 import { downloadAsZip } from "@/utils/zipDownload";
@@ -97,11 +96,12 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>Compress Images & PDFs Online – Free, Secure & Fast | Finvestech</title>
+        <title>Compress Images & PDFs Instantly – Free & Private | Finvestech Tools</title>
         <meta
           name="description"
-          content="Compress images and PDF files instantly in your browser. 100% free, secure, and private. No uploads or storage required."
+          content="Fast, private, and free file compressor. Reduce size of images and PDFs without losing quality — works fully in your browser."
         />
+        <meta name="keywords" content="compress images, compress PDF, image compressor, PDF compressor, reduce file size, free compressor, online compressor, US, UK, Canada" />
       </Helmet>
 
       <div className="min-h-screen flex flex-col">
@@ -215,16 +215,6 @@ const Index = () => {
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
                   <FileUpload onFilesSelected={handleFilesSelected} />
-
-                  {files.length === 0 && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <SampleFiles />
-                    </motion.div>
-                  )}
 
                   {files.length > 0 && (
                     <motion.div
