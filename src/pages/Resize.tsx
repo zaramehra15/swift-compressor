@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Helmet } from "react-helmet";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import MobileToolNav from "@/components/MobileToolNav";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -354,6 +355,7 @@ const Resize = () => {
         </main>
 
         <Footer />
+        <MobileToolNav />
       </div>
     </>
   );

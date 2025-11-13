@@ -1,4 +1,9 @@
 import { Link } from "react-router-dom";
+import { Coffee } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// CONFIGURATION: Replace with your Buy Me a Coffee username
+const BUY_ME_COFFEE_URL = "https://www.buymeacoffee.com/YOUR_USERNAME";
 
 const Footer = () => {
   return (
@@ -7,9 +12,18 @@ const Footer = () => {
         <div className="flex flex-col md:flex-row justify-between items-start gap-8">
           <div className="max-w-md">
             <h3 className="text-lg font-semibold text-foreground mb-2">Finvestech Tools</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Free online tools for compressing, converting, and resizing files. All processing happens in your browser for maximum privacy and security.
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              onClick={() => window.open(BUY_ME_COFFEE_URL, '_blank')}
+            >
+              <Coffee className="w-4 h-4" />
+              Buy Me a Coffee
+            </Button>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 gap-8">

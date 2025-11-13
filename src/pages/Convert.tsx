@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Helmet } from "react-helmet";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import MobileToolNav from "@/components/MobileToolNav";
 import ConversionSelector from "@/components/ConversionSelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,9 +15,11 @@ import {
   ArrowRight, 
   Download,
   X,
-  Loader2 
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Convert = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -308,6 +311,18 @@ const Convert = () => {
                     />
                   </div>
 
+                  {/* Size Limit Notice */}
+                  {(selectedCategory === 'video' || selectedCategory === 'audio') && (
+                    <Alert className="mb-6">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {selectedCategory === 'video' 
+                          ? 'Best for files under 50MB. Large video conversions may take longer or require more memory.'
+                          : 'Audio file conversion works best for files under 30MB for optimal browser performance.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* File Upload */}
                   {files.length === 0 && (
                     <div className="border-2 border-dashed border-border rounded-xl p-12 text-center hover:border-primary transition-smooth cursor-pointer">
@@ -448,6 +463,7 @@ const Convert = () => {
         </main>
 
         <Footer />
+        <MobileToolNav />
       </div>
     </>
   );

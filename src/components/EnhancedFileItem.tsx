@@ -23,7 +23,12 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
   const [compressedSize, setCompressedSize] = useState<number>(0);
   const [thumbnail, setThumbnail] = useState<string>("");
   const [progress, setProgress] = useState(0);
+  const [lastQuality, setLastQuality] = useState(quality);
+  const [lastFormat, setLastFormat] = useState(format);
   const { toast } = useToast();
+
+  // Allow re-compression if quality or format changes
+  const canRecompress = compressed && (quality !== lastQuality || format !== lastFormat);
 
   const isImage = file.type.startsWith("image/");
   const isPDF = file.type === "application/pdf";
@@ -67,12 +72,14 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
 
       setCompressedBlob(blob);
       setCompressed(true);
+      setLastQuality(quality);
+      setLastFormat(format);
       onCompressed(blob);
 
       const ratio = calculateCompressionRatio(originalSize, blob.size);
       toast({
         title: "Compression successful!",
-        description: `Reduced file size by ${ratio}%`,
+        description: `Reduced file size by ${ratio}% - Download ready`,
       });
     } catch (error) {
       clearInterval(progressInterval);
@@ -156,7 +163,7 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {!compressed && !compressing && (
               <Button
                 onClick={handleCompress}
@@ -168,21 +175,33 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
             )}
 
             {compressed && (
-              <Button
-                onClick={handleDownload}
-                size="sm"
-                variant="outline"
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </Button>
+              <>
+                <Button
+                  onClick={handleDownload}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </Button>
+                {canRecompress && (
+                  <Button
+                    onClick={handleCompress}
+                    size="sm"
+                    variant="secondary"
+                    className="gap-2"
+                  >
+                    Re-compress
+                  </Button>
+                )}
+              </>
             )}
 
             {compressing && (
               <Button size="sm" disabled>
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Processing
+                Compressing... {progress}%
               </Button>
             )}
           </div>

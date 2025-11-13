@@ -19,9 +19,16 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
       </div>
 
       <RadioGroup value={quality} onValueChange={(val) => onQualityChange(val as any)}>
-        <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-          quality === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'
-        }`}>
+        <div 
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
+            quality === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+          }`}
+          onClick={() => onQualityChange('high')}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('high')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={quality === 'high'}
+        >
           <RadioGroupItem value="high" id="high" />
           <div className="flex-1">
             <Label htmlFor="high" className="cursor-pointer font-medium">
@@ -34,9 +41,16 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
           </div>
         </div>
 
-        <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-          quality === 'medium' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'
-        }`}>
+        <div 
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
+            quality === 'medium' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+          }`}
+          onClick={() => onQualityChange('medium')}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('medium')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={quality === 'medium'}
+        >
           <RadioGroupItem value="medium" id="medium" />
           <div className="flex-1">
             <Label htmlFor="medium" className="cursor-pointer font-medium">
@@ -49,9 +63,16 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
           </div>
         </div>
 
-        <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-          quality === 'low' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'
-        }`}>
+        <div 
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
+            quality === 'low' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+          }`}
+          onClick={() => onQualityChange('low')}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('low')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={quality === 'low'}
+        >
           <RadioGroupItem value="low" id="low" />
           <div className="flex-1">
             <Label htmlFor="low" className="cursor-pointer font-medium">

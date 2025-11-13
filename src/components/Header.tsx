@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
-import { FileArchive, Menu, X } from "lucide-react";
+import { FileArchive, Menu, X, Coffee } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+
+// CONFIGURATION: Replace with your Buy Me a Coffee username
+const BUY_ME_COFFEE_URL = "https://www.buymeacoffee.com/YOUR_USERNAME";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -52,6 +55,15 @@ const Header = () => {
             >
               Contact
             </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              onClick={() => window.open(BUY_ME_COFFEE_URL, '_blank')}
+            >
+              <Coffee className="w-4 h-4" />
+              Support Us
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -103,6 +115,18 @@ const Header = () => {
             >
               Contact
             </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground mt-2"
+              onClick={() => {
+                window.open(BUY_ME_COFFEE_URL, '_blank');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <Coffee className="w-4 h-4" />
+              Support Us
+            </Button>
           </div>
         )}
       </nav>
