@@ -10,24 +10,31 @@ self.onmessage = async (e: MessageEvent<CompressionMessage>) => {
 
   try {
     // Quality settings - mapped to achieve target compression ratios
-    // High: ~30% smaller (0.85 quality)
-    // Medium: ~50% smaller (0.70 quality)
-    // Low: ~70% smaller (0.50 quality)
+    // High: ~20-30% smaller (0.92 quality, minimal dimension reduction)
+    // Medium: ~45-55% smaller (0.75 quality, moderate dimension reduction)
+    // Low: ~65-75% smaller (0.50 quality, aggressive dimension reduction)
     const qualityMap = {
       low: 0.50,
-      medium: 0.70,
-      high: 0.85,
+      medium: 0.75,
+      high: 0.92,
+    };
+
+    // Dimension limits based on quality (to prevent over-compression)
+    const maxDimensionMap = {
+      low: 1920,      // Allow more dimension reduction for low quality
+      medium: 2560,   // Moderate dimension reduction for medium
+      high: 3840,     // Minimal dimension reduction for high quality (4K)
     };
 
     const compressionQuality = qualityMap[quality];
+    const maxDimension = maxDimensionMap[quality];
 
     // Read file
     const bitmap = await createImageBitmap(file);
     
-    // Calculate dimensions (max 1920px)
+    // Calculate dimensions - only reduce if exceeds the quality-based limit
     let width = bitmap.width;
     let height = bitmap.height;
-    const maxDimension = 1920;
 
     if (width > maxDimension || height > maxDimension) {
       if (width > height) {

@@ -35,7 +35,7 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               High Quality
             </Label>
             <p className="text-xs text-muted-foreground">
-              Best quality, ~30% smaller
+              Best quality, ~20-30% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'high'))})`}
             </p>
           </div>
@@ -57,7 +57,7 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               Medium Quality (Recommended)
             </Label>
             <p className="text-xs text-muted-foreground">
-              Balanced, ~50% smaller
+              Balanced, ~45-55% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'medium'))})`}
             </p>
           </div>
@@ -79,7 +79,7 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               Low Quality
             </Label>
             <p className="text-xs text-muted-foreground">
-              Maximum compression, ~70% smaller
+              Maximum compression, ~65-75% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'low'))})`}
             </p>
           </div>
