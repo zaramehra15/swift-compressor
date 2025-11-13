@@ -61,7 +61,7 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
         blob = result.blob;
         setCompressedSize(result.compressedSize);
       } else if (isPDF) {
-        blob = await compressPDF(file);
+        blob = await compressPDF(file, quality);
         setCompressedSize(blob.size);
       } else {
         throw new Error("Unsupported file type");

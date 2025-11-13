@@ -62,9 +62,9 @@ export const estimateCompressedSize = (
   quality: 'low' | 'medium' | 'high'
 ): number => {
   const reductionMap = {
-    low: 0.3, // ~70% reduction
-    medium: 0.5, // ~50% reduction
-    high: 0.7, // ~30% reduction
+    low: 0.30,   // Target ~70% reduction (keep ~30% of size)
+    medium: 0.50, // Target ~50% reduction (keep ~50% of size)
+    high: 0.75,   // Target ~25% reduction (keep ~75% of size)
   };
 
   return Math.round(originalSize * reductionMap[quality]);

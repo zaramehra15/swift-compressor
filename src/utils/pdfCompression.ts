@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 
-export const compressPDF = async (file: File): Promise<Blob> => {
+export const compressPDF = async (file: File, quality: 'low' | 'medium' | 'high' = 'medium'): Promise<Blob> => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -19,10 +19,16 @@ export const compressPDF = async (file: File): Promise<Blob> => {
       newPdfDoc.addPage(copiedPage);
     }
 
-    // Save with compression
-    const pdfBytes = await newPdfDoc.save({
-      useObjectStreams: false, // Helps with compatibility
-    });
+    // Compression settings based on quality
+    // For PDFs, we primarily control object streams and metadata
+    const compressionSettings = {
+      low: { useObjectStreams: true, addDefaultPage: false },
+      medium: { useObjectStreams: true, addDefaultPage: false },
+      high: { useObjectStreams: false, addDefaultPage: false },
+    };
+
+    // Save with compression settings based on quality
+    const pdfBytes = await newPdfDoc.save(compressionSettings[quality]);
 
     return new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
   } catch (error) {
