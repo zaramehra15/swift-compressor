@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import MobileToolNav from "@/components/MobileToolNav";
 import FileUpload from "@/components/FileUpload";
 import EnhancedFileItem from "@/components/EnhancedFileItem";
 import QualitySelector from "@/components/QualitySelector";
@@ -371,6 +372,7 @@ const Index = () => {
         </main>
 
         <Footer />
+        <MobileToolNav />
       </div>
     </>
   );

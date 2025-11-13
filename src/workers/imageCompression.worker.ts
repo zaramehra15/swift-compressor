@@ -9,11 +9,14 @@ self.onmessage = async (e: MessageEvent<CompressionMessage>) => {
   const { file, quality, format } = e.data;
 
   try {
-    // Quality settings
+    // Quality settings - mapped to achieve target compression ratios
+    // High: ~30% smaller (0.85 quality)
+    // Medium: ~50% smaller (0.70 quality)
+    // Low: ~70% smaller (0.50 quality)
     const qualityMap = {
-      low: 0.6,
-      medium: 0.75,
-      high: 0.9,
+      low: 0.50,
+      medium: 0.70,
+      high: 0.85,
     };
 
     const compressionQuality = qualityMap[quality];
