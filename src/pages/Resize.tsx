@@ -47,6 +47,8 @@ const Resize = () => {
         img.src = event.target?.result as string;
       };
       reader.readAsDataURL(selectedFile);
+      // Reset input value to allow re-selecting files
+      e.target.value = '';
     }
   };
 

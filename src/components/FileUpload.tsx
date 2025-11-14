@@ -50,6 +50,8 @@ const FileUpload = ({ onFilesSelected, acceptedTypes = "image/*,.pdf" }: FileUpl
     if (e.target.files) {
       const files = Array.from(e.target.files);
       onFilesSelected(files);
+      // Reset input value to allow re-selecting the same file
+      e.target.value = '';
     }
   };
 
