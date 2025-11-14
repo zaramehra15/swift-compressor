@@ -64,6 +64,8 @@ const Convert = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFiles(Array.from(e.target.files));
+      // Reset input value to allow re-selecting files
+      e.target.value = '';
     }
   };
 
