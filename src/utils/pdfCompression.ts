@@ -3,36 +3,47 @@ import { PDFDocument } from "pdf-lib";
 export const compressPDF = async (file: File, quality: 'low' | 'medium' | 'high' = 'medium'): Promise<Blob> => {
   try {
     const arrayBuffer = await file.arrayBuffer();
+    const originalSize = file.size;
     const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-    // Get all pages
-    const pages = pdfDoc.getPages();
-
-    // Create a new PDF with optimized settings
     const newPdfDoc = await PDFDocument.create();
-
-    // Copy pages to new document (this strips some metadata)
+    const pages = pdfDoc.getPages();
     for (const page of pages) {
-      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [
-        pdfDoc.getPages().indexOf(page),
-      ]);
+      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pdfDoc.getPages().indexOf(page)]);
       newPdfDoc.addPage(copiedPage);
     }
 
-    // Compression settings based on quality
-    // For PDFs, we primarily control object streams and metadata
-    const compressionSettings = {
-      low: { useObjectStreams: true, addDefaultPage: false },
-      medium: { useObjectStreams: true, addDefaultPage: false },
-      high: { useObjectStreams: false, addDefaultPage: false },
+    const TARGETS: Record<'low' | 'medium' | 'high', { min: number; max: number }> = {
+      low: { min: 0.80, max: 0.85 },
+      medium: { min: 0.45, max: 0.50 },
+      high: { min: 0.20, max: 0.22 },
     };
 
-    // Save with compression settings based on quality
-    const pdfBytes = await newPdfDoc.save(compressionSettings[quality]);
+    const { min, max } = TARGETS[quality];
 
-    return new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
+    const saveWith = async (opts: { useObjectStreams: boolean; addDefaultPage: boolean }) => {
+      const bytes = await newPdfDoc.save(opts);
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const reduction = (originalSize - blob.size) / originalSize;
+      return { blob, reduction };
+    };
+
+    const variants = [
+      await saveWith({ useObjectStreams: true, addDefaultPage: false }),
+      await saveWith({ useObjectStreams: false, addDefaultPage: false }),
+    ];
+
+    const inRange = variants.find(v => v.reduction >= min && v.reduction <= max);
+    if (inRange) return inRange.blob;
+
+    const belowMax = variants
+      .filter(v => v.reduction <= max)
+      .sort((a, b) => b.reduction - a.reduction)[0];
+    if (belowMax) return belowMax.blob;
+
+    const originalBlob = new Blob([arrayBuffer], { type: "application/pdf" });
+    return originalBlob;
   } catch (error) {
-    console.error("PDF compression error:", error);
     throw new Error("Failed to compress PDF. The file may be corrupted or encrypted.");
   }
 };

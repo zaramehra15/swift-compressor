@@ -180,6 +180,9 @@ const Home = () => {
                 })}
               </motion.div>
 
+              {/* Ad Gap Placeholder below tool cards */}
+              <div className="h-16" />
+
               {/* Feature Pills */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -200,6 +203,8 @@ const Home = () => {
                   );
                 })}
               </motion.div>
+              {/* Ad Gap Placeholder */}
+              <div className="h-16" />
             </div>
           </motion.section>
 
@@ -278,6 +283,33 @@ const Home = () => {
             </div>
           </section>
         </main>
+
+        {/* Support/Donation Section */}
+        <section className="py-16 px-4 bg-muted/30">
+          <div className="container mx-auto max-w-5xl">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-8 text-center border border-primary/20"
+            >
+              <h3 className="text-2xl font-bold text-foreground mb-3">
+                Love Finvestech Tools?
+              </h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Help us keep these tools free and ad-light. Your support helps us maintain and improve Finvestech Tools for everyone.
+              </p>
+              <Button
+                size="lg"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => window.open('https://buymeacoffee.com/finvestech', '_blank')}
+              >
+                Buy Me a Coffee
+              </Button>
+            </motion.div>
+          </div>
+        </section>
 
         <Footer />
       </div>

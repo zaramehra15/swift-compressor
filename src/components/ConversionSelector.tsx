@@ -18,8 +18,8 @@ const ConversionSelector = ({
   onToFormatChange,
 }: ConversionSelectorProps) => {
   const formats: Record<string, string[]> = {
-    images: ["JPG", "PNG", "WEBP", "GIF", "HEIC", "PDF"],
-    documents: ["PDF", "DOCX", "XLSX", "PPTX"],
+    images: ["JPG", "PNG", "WEBP", "GIF"],
+    documents: ["PDF", "DOCX", "XLSX", "PPTX", "CSV"],
     audio: ["MP3", "WAV", "M4A", "OGG"],
     video: ["MP4", "MOV", "AVI", "WEBM"],
   };
@@ -56,7 +56,33 @@ const ConversionSelector = ({
               <SelectValue placeholder="Select format" />
             </SelectTrigger>
             <SelectContent>
-              {availableFormats
+              {(category === 'documents'
+                ? (fromFormat === 'PDF'
+                  ? ['PDF', 'DOCX', 'PNG', 'JPG']
+                  : fromFormat === 'DOCX'
+                  ? ['PDF']
+                  : fromFormat === 'XLSX'
+                  ? ['PDF', 'CSV']
+                  : fromFormat === 'CSV'
+                  ? ['XLSX']
+                  : fromFormat === 'PPTX'
+                  ? ['PDF']
+                  : formats.documents)
+                : category === 'audio'
+                ? (fromFormat === 'MP3'
+                  ? ['WAV']
+                  : fromFormat === 'WAV'
+                  ? ['MP3']
+                  : fromFormat === 'M4A'
+                  ? ['MP3', 'WAV']
+                  : fromFormat === 'OGG'
+                  ? ['MP3', 'WAV']
+                  : formats.audio)
+                : category === 'video'
+                ? (['MP4', 'WEBM'])
+                : category === 'images'
+                ? ['JPG', 'PNG', 'WEBP']
+                : availableFormats)
                 .filter((format) => format !== fromFormat)
                 .map((format) => (
                   <SelectItem key={format} value={format}>

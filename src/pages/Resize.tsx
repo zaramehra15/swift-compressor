@@ -53,18 +53,22 @@ const Resize = () => {
   };
 
   const handleWidthChange = (newWidth: number) => {
-    setWidth(newWidth);
+    const maxDim = 8000;
+    const v = Number.isFinite(newWidth) ? Math.max(1, Math.min(maxDim, Math.round(newWidth))) : 1;
+    setWidth(v);
     if (aspectLocked && originalDimensions.width) {
       const ratio = originalDimensions.height / originalDimensions.width;
-      setHeight(Math.round(newWidth * ratio));
+      setHeight(Math.round(v * ratio));
     }
   };
 
   const handleHeightChange = (newHeight: number) => {
-    setHeight(newHeight);
+    const maxDim = 8000;
+    const v = Number.isFinite(newHeight) ? Math.max(1, Math.min(maxDim, Math.round(newHeight))) : 1;
+    setHeight(v);
     if (aspectLocked && originalDimensions.height) {
       const ratio = originalDimensions.width / originalDimensions.height;
-      setWidth(Math.round(newHeight * ratio));
+      setWidth(Math.round(v * ratio));
     }
   };
 
@@ -75,6 +79,14 @@ const Resize = () => {
 
   const handleResize = async () => {
     if (!file || !preview) return;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+      toast({ title: "Invalid dimensions", description: "Please enter valid width and height.", variant: "destructive" });
+      return;
+    }
+    if (width > 8000 || height > 8000) {
+      toast({ title: "Dimension too large", description: "Please keep dimensions under 8000px to avoid memory issues.", variant: "destructive" });
+      return;
+    }
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -83,11 +95,20 @@ const Resize = () => {
     img.onload = () => {
       canvas.width = width;
       canvas.height = height;
-      ctx?.drawImage(img, 0, 0, width, height);
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+      }
 
       // Determine output format and quality
       const outputMimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
       const quality = 0.85; // Good balance between quality and file size
+
+      if (outputMimeType === 'image/jpeg' && ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx?.drawImage(img, 0, 0, width, height);
 
       canvas.toBlob(
         (blob) => {
@@ -300,6 +321,9 @@ const Resize = () => {
                         <span>New dimensions:</span>
                         <span>{width} × {height}px</span>
                       </div>
+                      {(width > 5000 || height > 5000) && (
+                        <div className="mt-2 text-amber-600">Large dimensions may impact memory and performance.</div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -327,6 +351,8 @@ const Resize = () => {
                       Upload New Image
                     </Button>
                   )}
+                  {/* Ad Gap Placeholder */}
+                  <div className="h-16" />
                 </div>
               </Card>
             </div>
@@ -355,6 +381,33 @@ const Resize = () => {
             </div>
           </section>
         </main>
+
+        {/* Support/Donation Section */}
+        <section className="py-16 px-4 bg-muted/30">
+          <div className="container mx-auto max-w-5xl">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-8 text-center border border-primary/20"
+            >
+              <h3 className="text-2xl font-bold text-foreground mb-3">
+                Love Resize?
+              </h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Help us keep this resizer free and ad-light. Your support helps us maintain and improve resizing for everyone.
+              </p>
+              <Button
+                size="lg"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => window.open('https://buymeacoffee.com/finvestech', '_blank')}
+              >
+                Buy Me a Coffee
+              </Button>
+            </motion.div>
+          </div>
+        </section>
 
         <Footer />
         <MobileToolNav />

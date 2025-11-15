@@ -20,37 +20,31 @@ export const compressImageWithWorker = (
     );
 
     const QUALITY_TARGETS: Record<CompressionOptions['quality'], { min: number; max: number; q: number }> = {
-      low: { min: 0.65, max: 0.75, q: 0.36 },     // ~65–75% smaller
-      medium: { min: 0.45, max: 0.55, q: 0.58 },  // ~45–55% smaller
-      high: { min: 0.20, max: 0.30, q: 0.82 },    // ~20–30% smaller
+      low: { min: 0.80, max: 0.85, q: 0.25 },
+      medium: { min: 0.45, max: 0.50, q: 0.58 },
+      high: { min: 0.20, max: 0.22, q: 0.90 },
     };
 
     const getOutputType = (format: CompressionOptions['format'], inputType: string) => {
       if (format === 'jpeg') return 'image/jpeg';
       if (format === 'webp') return 'image/webp';
       if (format === 'png') return 'image/png';
-      // auto
       return inputType === 'image/png' ? 'image/webp' : 'image/jpeg';
     };
 
     const reencodeOnMainThread = async (
       f: File,
       format: CompressionOptions['format'],
+      quality: CompressionOptions['quality'],
       qTarget: number,
       min: number,
       max: number
     ): Promise<CompressionResult> => {
-      // Avoid wasting time on very small files
-      const MIN_BYTES_TO_COMPRESS = 200 * 1024; // 200KB
+      const MIN_BYTES_TO_COMPRESS = 50 * 1024;
       if (f.size < MIN_BYTES_TO_COMPRESS) {
         return { blob: f, originalSize: f.size, compressedSize: f.size };
       }
-
-      const type = getOutputType(format, f.type);
-      // If PNG output is explicitly requested, quality does not apply
-      if (type === 'image/png') {
-        return { blob: f, originalSize: f.size, compressedSize: f.size };
-      }
+      let type: 'image/jpeg' | 'image/webp' | 'image/png' = getOutputType(format, f.type) as any;
 
       const imgUrl = URL.createObjectURL(f);
       try {
@@ -68,6 +62,8 @@ export const compressImageWithWorker = (
         if (!ctx) throw new Error('Failed to get canvas context');
         ctx.drawImage(img, 0, 0);
 
+        // Auto already maps PNG → WebP and others → JPEG via getOutputType
+
         const toBlobWithQ = (qual: number) => new Promise<Blob>((res, rej) => {
           canvas.toBlob((b) => {
             if (!b) return rej(new Error('Canvas toBlob failed'));
@@ -75,39 +71,109 @@ export const compressImageWithWorker = (
           }, type, Math.max(0.1, Math.min(1, qual)));
         });
 
+        if (type === 'image/png') {
+          const pngBlob = await new Promise<Blob>((res, rej) => {
+            canvas.toBlob((b) => {
+              if (!b) return rej(new Error('Canvas toBlob failed'));
+              res(b);
+            }, 'image/png');
+          });
+          URL.revokeObjectURL(imgUrl);
+          return { blob: pngBlob, originalSize: f.size, compressedSize: pngBlob.size };
+        }
         const computeReduction = (size: number) => (f.size - size) / f.size;
-
         let q = qTarget;
         let bestWithin: { blob: Blob; reduction: number } | null = null;
         let lastBlob: Blob | null = null;
 
         for (let i = 0; i < 6; i++) {
-          const b = await toBlobWithQ(q);
+          const b = await new Promise<Blob>((res, rej) => {
+            canvas.toBlob((bb) => {
+              if (!bb) return rej(new Error('Canvas toBlob failed'));
+              res(bb);
+            }, type, Math.max(0.1, Math.min(1, q)));
+          });
           lastBlob = b;
           const reduction = computeReduction(b.size);
-
           if (reduction >= min && reduction <= max) {
             URL.revokeObjectURL(imgUrl);
             return { blob: b, originalSize: f.size, compressedSize: b.size };
           }
-
           if (reduction <= max) {
             if (!bestWithin || reduction > bestWithin.reduction) bestWithin = { blob: b, reduction };
           }
-
-          // Adjust q towards the target window
           if (reduction > max) {
-            // Too small → increase quality
             q = Math.min(1, q + 0.12);
           } else {
-            // Too large → decrease quality
             q = Math.max(0.1, q - 0.12);
           }
         }
-
         URL.revokeObjectURL(imgUrl);
-        const finalBlob = bestWithin?.blob ?? lastBlob ?? f;
-        return { blob: finalBlob, originalSize: f.size, compressedSize: finalBlob.size };
+        if (bestWithin) {
+          return { blob: bestWithin.blob, originalSize: f.size, compressedSize: bestWithin.blob.size };
+        }
+        const needAltForHighMedium = (quality === 'high' || quality === 'medium') && !bestWithin;
+        if (quality === 'low' || needAltForHighMedium) {
+          const altType: 'image/jpeg' | 'image/webp' = type === 'image/webp' ? 'image/jpeg' : 'image/webp';
+          let qL = 0.1;
+          let qH = 1.0;
+          let q2 = qTarget;
+          let best2: { blob: Blob; reduction: number } | null = null;
+          for (let i = 0; i < 6; i++) {
+            const b = await new Promise<Blob>((res, rej) => {
+              canvas.toBlob((bb) => {
+                if (!bb) return rej(new Error('Canvas toBlob failed'));
+                res(bb);
+              }, altType, Math.max(0.1, Math.min(1, q2)));
+            });
+            const r = computeReduction(b.size);
+            if (r >= min && r <= max) {
+              return { blob: b, originalSize: f.size, compressedSize: b.size };
+            }
+            if (r <= max) { if (!best2 || r > best2.reduction) best2 = { blob: b, reduction: r }; }
+            if (r > max) { qL = q2; } else { qH = q2; }
+            const nq = (qL + qH) / 2;
+            if (Math.abs(nq - q2) < 0.02) {
+              q2 = nq;
+              const b2 = await new Promise<Blob>((res, rej) => {
+                canvas.toBlob((bb) => {
+                  if (!bb) return rej(new Error('Canvas toBlob failed'));
+                  res(bb);
+                }, altType, Math.max(0.1, Math.min(1, q2)));
+              });
+              const r2 = computeReduction(b2.size);
+              if (r2 >= min && r2 <= max) {
+                return { blob: b2, originalSize: f.size, compressedSize: b2.size };
+              }
+              if (r2 <= max) { if (!best2 || r2 > best2.reduction) best2 = { blob: b2, reduction: r2 }; }
+              break;
+            }
+            q2 = nq;
+          }
+          if (best2) {
+            return { blob: best2.blob, originalSize: f.size, compressedSize: best2.blob.size };
+          }
+        }
+        const maxQBlob = await new Promise<Blob>((res, rej) => {
+          canvas.toBlob((bb) => {
+            if (!bb) return rej(new Error('Canvas toBlob failed'));
+            res(bb);
+          }, type, 1.0);
+        });
+        const maxReduction = computeReduction(maxQBlob.size);
+        if (maxReduction > max) {
+          const pngBlob = await new Promise<Blob>((res, rej) => {
+            canvas.toBlob((bb) => {
+              if (!bb) return rej(new Error('Canvas toBlob failed'));
+              res(bb);
+            }, 'image/png');
+          });
+          return { blob: pngBlob, originalSize: f.size, compressedSize: pngBlob.size };
+        }
+        if ((f.size - maxQBlob.size) / f.size <= 0) {
+          return { blob: f, originalSize: f.size, compressedSize: f.size };
+        }
+        return { blob: maxQBlob, originalSize: f.size, compressedSize: maxQBlob.size };
       } finally {
         URL.revokeObjectURL(imgUrl);
       }
@@ -121,23 +187,14 @@ export const compressImageWithWorker = (
         const compressedSize = e.data.compressedSize as number;
         const reduction = (originalSize - compressedSize) / originalSize;
         const { min, max, q } = QUALITY_TARGETS[options.quality];
-
-        // If worker result is within the target range, use it
         if (reduction >= min && reduction <= max) {
-          resolve({
-            blob: e.data.blob,
-            originalSize,
-            compressedSize,
-          });
+          resolve({ blob: e.data.blob, originalSize, compressedSize });
           return;
         }
-
-        // Fallback: do a deterministic main-thread re-encode using HTMLCanvasElement.toBlob
         try {
-          const fallback = await reencodeOnMainThread(file, options.format, q, min, max);
+          const fallback = await reencodeOnMainThread(file, options.format, options.quality, q, min, max);
           resolve(fallback);
         } catch (fallbackErr) {
-          // As a last resort, still resolve with worker result to avoid blocking
           resolve({ blob: e.data.blob, originalSize, compressedSize });
         }
       } else {
@@ -173,11 +230,10 @@ export const estimateCompressedSize = (
   originalSize: number,
   quality: 'low' | 'medium' | 'high'
 ): number => {
-  const reductionMap = {
-    low: 0.30,   // Target ~70% reduction (keep ~30% of size)
-    medium: 0.50, // Target ~50% reduction (keep ~50% of size)
-    high: 0.75,   // Target ~25% reduction (keep ~75% of size)
+  const keepMap = {
+    high: 0.80,
+    medium: 0.50,
+    low: 0.35,
   };
-
-  return Math.round(originalSize * reductionMap[quality]);
+  return Math.round(originalSize * keepMap[quality]);
 };
