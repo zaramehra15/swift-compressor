@@ -303,7 +303,7 @@ const Home = () => {
               <Button
                 size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => window.open('https://buymeacoffee.com/finvestech', '_blank')}
+                onClick={() => window.open('https://buymeacoffee.com/zaramehra1z', '_blank')}
               >
                 Buy Me a Coffee
               </Button>

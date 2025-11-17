@@ -1,16 +1,23 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type OutputFormat = 'auto' | 'jpeg' | 'webp' | 'png';
+
 interface FormatSelectorProps {
-  format: 'auto' | 'jpeg' | 'webp' | 'png';
-  onFormatChange: (format: 'auto' | 'jpeg' | 'webp' | 'png') => void;
+  format: OutputFormat;
+  onFormatChange: (format: OutputFormat) => void;
 }
 
 const FormatSelector = ({ format, onFormatChange }: FormatSelectorProps) => {
   return (
     <div className="space-y-2">
       <Label className="text-base font-semibold">Output Format</Label>
-      <Select value={format} onValueChange={(val) => onFormatChange(val as any)}>
+      <Select value={format} onValueChange={(val) => {
+        const isFormat = (v: string): v is OutputFormat => (
+          v === 'auto' || v === 'jpeg' || v === 'webp' || v === 'png'
+        );
+        onFormatChange(isFormat(val) ? val : format);
+      }}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select format" />
         </SelectTrigger>

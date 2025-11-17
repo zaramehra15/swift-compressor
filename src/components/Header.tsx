@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 // CONFIGURATION: Replace with your Buy Me a Coffee username
-const BUY_ME_COFFEE_URL = "https://www.buymeacoffee.com/YOUR_USERNAME";
+const BUY_ME_COFFEE_URL = "https://buymeacoffee.com/zaramehra1z";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

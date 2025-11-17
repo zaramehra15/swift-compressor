@@ -1,49 +1,53 @@
-import { PDFDocument } from "pdf-lib";
+import { jsPDF } from "jspdf";
+
+type PdfJs = typeof import('pdfjs-dist');
 
 export const compressPDF = async (file: File, quality: 'low' | 'medium' | 'high' = 'medium'): Promise<Blob> => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const originalSize = file.size;
-    const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const SCALE_MAP: Record<'low' | 'medium' | 'high', number> = { low: 1.2, medium: 1.5, high: 2.0 };
+  const JPEG_Q_MAP: Record<'low' | 'medium' | 'high', number> = { low: 0.6, medium: 0.75, high: 0.85 };
 
-    const newPdfDoc = await PDFDocument.create();
-    const pages = pdfDoc.getPages();
-    for (const page of pages) {
-      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pdfDoc.getPages().indexOf(page)]);
-      newPdfDoc.addPage(copiedPage);
+  try {
+    const pdfjsLib = (await import('pdfjs-dist')) as unknown as PdfJs;
+    if (!pdfjsLib.GlobalWorkerOptions.workerPort) {
+      const worker = new Worker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url), { type: 'module' });
+      pdfjsLib.GlobalWorkerOptions.workerPort = worker;
     }
 
-    const TARGETS: Record<'low' | 'medium' | 'high', { min: number; max: number }> = {
-      low: { min: 0.80, max: 0.85 },
-      medium: { min: 0.45, max: 0.50 },
-      high: { min: 0.20, max: 0.22 },
+    const arrayBuffer = await file.arrayBuffer();
+    type PdfPage = {
+      getViewport: (opts: { scale: number }) => { width: number; height: number };
+      render: (params: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number } }) => { promise: Promise<void> };
     };
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer }) as unknown as { promise: Promise<{ numPages: number; getPage: (i: number) => Promise<PdfPage> }>; };
+    const pdf = await loadingTask.promise;
 
-    const { min, max } = TARGETS[quality];
+    let doc: jsPDF | null = null;
+    const scale = SCALE_MAP[quality];
+    const jpegQ = JPEG_Q_MAP[quality];
 
-    const saveWith = async (opts: { useObjectStreams: boolean; addDefaultPage: boolean }) => {
-      const bytes = await newPdfDoc.save(opts);
-      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
-      const reduction = (originalSize - blob.size) / originalSize;
-      return { blob, reduction };
-    };
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get canvas context');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
 
-    const variants = [
-      await saveWith({ useObjectStreams: true, addDefaultPage: false }),
-      await saveWith({ useObjectStreams: false, addDefaultPage: false }),
-    ];
+      const dataUrl = canvas.toDataURL('image/jpeg', jpegQ);
+      if (!doc) {
+        doc = new jsPDF({ orientation: viewport.width >= viewport.height ? 'l' : 'p', unit: 'px', format: [canvas.width, canvas.height] });
+      } else {
+        doc.addPage([canvas.width, canvas.height], viewport.width >= viewport.height ? 'l' : 'p');
+      }
+      doc.addImage(dataUrl, 'JPEG', 0, 0, canvas.width, canvas.height);
+    }
 
-    const inRange = variants.find(v => v.reduction >= min && v.reduction <= max);
-    if (inRange) return inRange.blob;
-
-    const belowMax = variants
-      .filter(v => v.reduction <= max)
-      .sort((a, b) => b.reduction - a.reduction)[0];
-    if (belowMax) return belowMax.blob;
-
-    const originalBlob = new Blob([arrayBuffer], { type: "application/pdf" });
-    return originalBlob;
-  } catch (error) {
-    throw new Error("Failed to compress PDF. The file may be corrupted or encrypted.");
+    if (!doc) throw new Error('Failed to load PDF');
+    return doc.output('blob');
+  } catch (e) {
+    const ab = await file.arrayBuffer();
+    return new Blob([ab], { type: 'application/pdf' });
   }
 };

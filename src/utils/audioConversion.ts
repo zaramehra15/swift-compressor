@@ -1,6 +1,8 @@
 export const decodeToAudioBuffer = async (file: File): Promise<AudioBuffer> => {
   const arrayBuffer = await file.arrayBuffer();
-  const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+  type WinWithWebkit = Window & { webkitAudioContext?: typeof AudioContext };
+  const Ctor = (window as WinWithWebkit).webkitAudioContext ?? window.AudioContext;
+  const ac = new Ctor();
   const audioBuffer = await ac.decodeAudioData(arrayBuffer);
   ac.close();
   return audioBuffer;
@@ -21,7 +23,7 @@ const interleave = (left: Float32Array, right: Float32Array) => {
 
 const floatTo16BitPCM = (output: DataView, offset: number, input: Float32Array) => {
   for (let i = 0; i < input.length; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, input[i]));
+    const s = Math.max(-1, Math.min(1, input[i]));
     output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
 };
@@ -60,13 +62,14 @@ export const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
 };
 
 export const audioBufferToMp3 = async (audioBuffer: AudioBuffer, kbps = 192): Promise<Blob> => {
-  const Lame = await import('lamejs');
+  type LameModule = { Mp3Encoder: new (channels: number, sampleRate: number, kbps: number) => { encodeBuffer: (left: Int16Array, right: Int16Array) => Uint8Array; flush: () => Uint8Array } };
+  const Lame = (await import('lamejs')) as unknown as LameModule;
   const numChannels = Math.min(audioBuffer.numberOfChannels, 2);
   const sampleRate = audioBuffer.sampleRate;
   const left = audioBuffer.getChannelData(0);
   const right = numChannels > 1 ? audioBuffer.getChannelData(1) : audioBuffer.getChannelData(0);
   const samples = interleave(left, right);
-  const mp3encoder = new (Lame as any).Mp3Encoder(2, sampleRate, kbps);
+  const mp3encoder = new Lame.Mp3Encoder(2, sampleRate, kbps);
   const maxSamples = 1152;
   const mp3Data: Uint8Array[] = [];
   let i = 0;

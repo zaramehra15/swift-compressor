@@ -25,7 +25,7 @@ export const compressImageWithWorker = (
       high: { min: 0.20, max: 0.22, q: 0.90 },
     };
 
-    const getOutputType = (format: CompressionOptions['format'], inputType: string) => {
+    const getOutputType = (format: CompressionOptions['format'], inputType: string): 'image/jpeg' | 'image/webp' | 'image/png' => {
       if (format === 'jpeg') return 'image/jpeg';
       if (format === 'webp') return 'image/webp';
       if (format === 'png') return 'image/png';
@@ -44,7 +44,7 @@ export const compressImageWithWorker = (
       if (f.size < MIN_BYTES_TO_COMPRESS) {
         return { blob: f, originalSize: f.size, compressedSize: f.size };
       }
-      let type: 'image/jpeg' | 'image/webp' | 'image/png' = getOutputType(format, f.type) as any;
+      const type: 'image/jpeg' | 'image/webp' | 'image/png' = getOutputType(format, f.type);
 
       const imgUrl = URL.createObjectURL(f);
       try {

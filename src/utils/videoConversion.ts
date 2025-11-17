@@ -64,8 +64,8 @@ export const convertVideo = async (file: File, to: 'mp4' | 'webm'): Promise<Blob
     ffmpeg.FS('unlink', outputName);
     return blob;
   } catch (e) {
-    try { ffmpeg.FS('unlink', inputName); } catch {}
-    try { ffmpeg.FS('unlink', outputName); } catch {}
+    try { ffmpeg.FS('unlink', inputName); } catch { void 0; }
+    try { ffmpeg.FS('unlink', outputName); } catch { void 0; }
     throw new Error('Video conversion failed');
   }
 };

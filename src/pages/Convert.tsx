@@ -162,7 +162,7 @@ const Convert = () => {
             const out = await convertXlsxToPdf(file);
             newConvertedFiles.set(file.name, out);
           } else if (from === 'pdf' && (to === 'png' || to === 'jpg')) {
-            const out = await convertPdfToImagesZip(file, to as any);
+            const out = await convertPdfToImagesZip(file, (to as 'png' | 'jpg'));
             newConvertedFiles.set(file.name, out);
           } else if (from === 'csv' && to === 'xlsx') {
             const out = await convertCsvToXlsx(file);
@@ -605,7 +605,7 @@ const Convert = () => {
                 <Button
                   size="lg"
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => window.open('https://buymeacoffee.com/finvestech', '_blank')}
+                  onClick={() => window.open('https://buymeacoffee.com/zaramehra1z', '_blank')}
                 >
                   Buy Me a Coffee
                 </Button>

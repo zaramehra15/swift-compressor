@@ -28,16 +28,24 @@ export const convertDocxToPdf = async (file: File): Promise<Blob> => {
 
 export const convertPdfToDocx = async (file: File): Promise<Blob> => {
   const pdfjsLib = await import('pdfjs-dist');
-  await ensurePdfWorker(pdfjsLib);
+  await ensurePdfWorker(pdfjsLib as unknown as typeof import('pdfjs-dist'));
   const docx = await import('docx');
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
-  const paragraphs: any[] = [];
+  const paragraphs: InstanceType<typeof docx.Paragraph>[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    const text = textContent.items.map((t: any) => ('str' in t ? t.str : '')).join(' ');
+  const text = (textContent.items as Array<unknown>)
+      .map((t) => {
+        if (typeof t === 'object' && t) {
+          const maybe = t as { str?: unknown };
+          return typeof maybe.str === 'string' ? maybe.str : '';
+        }
+        return '';
+      })
+      .join(' ');
     paragraphs.push(new docx.Paragraph(text));
   }
   const d = new docx.Document({ sections: [{ properties: {}, children: paragraphs }] });
@@ -95,7 +103,8 @@ export const convertPdfToImagesZip = async (file: File, format: 'png' | 'jpg' = 
     const ctx = canvas.getContext('2d');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    await page.render({ canvasContext: ctx as any, viewport }).promise;
+    if (!ctx) throw new Error('Failed to get canvas context');
+    await page.render({ canvasContext: ctx, viewport }).promise;
     const mime = format === 'png' ? 'image/png' : 'image/jpeg';
     const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b as Blob), mime, 0.95));
     zip.file(`page_${i}.${format}`, blob);
@@ -122,10 +131,9 @@ export const convertXlsxToCsv = async (file: File): Promise<Blob> => {
   return new Blob([csv], { type: 'text/csv' });
 };
 import html2canvas from 'html2canvas';
-const _w: any = window as any;
-_w.html2canvas = html2canvas;
+(window as Window & { html2canvas?: typeof html2canvas }).html2canvas = html2canvas;
 let _pdfWorkerInitialized = false;
-const ensurePdfWorker = async (pdfjsLib: any) => {
+const ensurePdfWorker = async (pdfjsLib: typeof import('pdfjs-dist')) => {
   if (!_pdfWorkerInitialized) {
     const worker = new Worker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url), { type: 'module' });
     pdfjsLib.GlobalWorkerOptions.workerPort = worker;

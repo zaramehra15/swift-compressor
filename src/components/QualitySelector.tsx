@@ -2,9 +2,11 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { estimateCompressedSize, formatFileSize } from "@/utils/compressionWorker";
 
+type Quality = 'low' | 'medium' | 'high';
+
 interface QualitySelectorProps {
-  quality: 'low' | 'medium' | 'high';
-  onQualityChange: (quality: 'low' | 'medium' | 'high') => void;
+  quality: Quality;
+  onQualityChange: (quality: Quality) => void;
   totalSize?: number;
 }
 
@@ -18,7 +20,12 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
         </p>
       </div>
 
-      <RadioGroup value={quality} onValueChange={(val) => onQualityChange(val as any)}>
+      <RadioGroup value={quality} onValueChange={(val) => {
+        const isQuality = (v: string): v is Quality => (
+          v === 'low' || v === 'medium' || v === 'high'
+        );
+        onQualityChange(isQuality(val) ? val : quality);
+      }}>
         <div 
           className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
             quality === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
