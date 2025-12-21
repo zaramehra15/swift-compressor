@@ -193,6 +193,7 @@ const Index = () => {
                     transition={{ delay: 0.3 }}
                   >
                     {/* <FormatSelector format={format} onFormatChange={setFormat} /> */}
+
                   </motion.div>
 
                   {/* Ad Placeholder - Desktop Sidebar */}
