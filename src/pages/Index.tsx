@@ -192,7 +192,7 @@ const Index = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
                   >
-                    {/* <FormatSelector format={format} onFormatChange={setFormat} /> */}
+                    <FormatSelector format={format} onFormatChange={setFormat} />
                   </motion.div>
 
                   {/* Ad Placeholder - Desktop Sidebar */}
