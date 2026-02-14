@@ -7,29 +7,43 @@ import ConversionSelector from "@/components/ConversionSelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Image as ImageIcon, 
-  FileText, 
-  Music, 
-  Video, 
-  ArrowRight, 
+import {
+  Image as ImageIcon,
+  FileText,
+  Music,
+  Video,
+  ArrowRight,
   Download,
   X,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Archive,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { compressPDF } from "@/utils/pdfCompression";
-import { convertDocxToPdf, convertPdfToDocx, convertPptxToPdf, convertXlsxToPdf, convertPdfToImagesZip, convertCsvToXlsx, convertXlsxToCsv } from "@/utils/documentConversion";
+import {
+  convertDocxToPdf,
+  convertPdfToDocx,
+  convertPptxToPdf,
+  convertXlsxToPdf,
+  convertPdfToImagesZip,
+  convertCsvToXlsx,
+  convertXlsxToCsv,
+  convertPdfToText,
+  convertTextToPdf,
+  convertDocxToText,
+} from "@/utils/documentConversion";
 import { convertAudio } from "@/utils/audioConversion";
+import { convertVideo } from "@/utils/videoConversion";
+import { downloadAsZip } from "@/utils/zipDownload";
 
 const Convert = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [fromFormat, setFromFormat] = useState<string>("");
   const [toFormat, setToFormat] = useState<string>("");
   const [files, setFiles] = useState<File[]>([]);
-  const [convertedFiles, setConvertedFiles] = useState<Map<string, Blob>>(new Map());
+  const [convertedFiles, setConvertedFiles] = useState<Map<string, { blob: Blob; originalName: string }>>(new Map());
   const [converting, setConverting] = useState(false);
   const { toast } = useToast();
 
@@ -38,31 +52,46 @@ const Convert = () => {
       id: "images",
       name: "Images",
       icon: ImageIcon,
-      formats: ["JPG", "PNG", "WEBP", "GIF"],
-      description: "Convert between image formats"
+      formats: ["JPG", "PNG", "WEBP", "GIF", "BMP", "TIFF", "ICO"],
+      description: "Convert between image formats",
     },
     {
       id: "documents",
-      name: "Documents",
+      name: "Documents & PDF",
       icon: FileText,
-      formats: ["PDF", "DOCX", "XLSX", "PPTX", "CSV"],
-      description: "Convert documents and PDFs"
+      formats: ["PDF", "DOCX", "XLSX", "PPTX", "CSV", "TXT"],
+      description: "Convert documents, spreadsheets & PDFs",
     },
     {
       id: "audio",
       name: "Audio",
       icon: Music,
-      formats: ["MP3", "WAV", "M4A", "OGG"],
-      description: "Convert audio files"
+      formats: ["MP3", "WAV", "M4A", "OGG", "AAC"],
+      description: "Convert audio files",
     },
     {
       id: "video",
       name: "Video",
       icon: Video,
-      formats: ["MP4", "MOV", "AVI", "WEBM"],
-      description: "Convert video files"
-    }
+      formats: ["MP4", "MOV", "AVI", "WEBM", "MKV"],
+      description: "Convert video files",
+    },
   ];
+
+  const getAcceptTypes = (): string => {
+    switch (selectedCategory) {
+      case "images":
+        return "image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/x-icon,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.ico";
+      case "documents":
+        return ".pdf,.docx,.xlsx,.pptx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      case "audio":
+        return "audio/*,.mp3,.wav,.m4a,.ogg,.aac";
+      case "video":
+        return "video/*,.mp4,.mov,.avi,.webm,.mkv";
+      default:
+        return "*";
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -79,14 +108,74 @@ const Convert = () => {
         });
       }
 
-      setFiles(valid);
-      // Reset input value to allow re-selecting files
+      setFiles(prev => [...prev, ...valid]);
+      setConvertedFiles(new Map());
       e.target.value = '';
     }
   };
 
   const handleRemoveFile = (index: number) => {
     setFiles(files.filter((_, i) => i !== index));
+  };
+
+  // Image conversion
+  const convertImage = async (file: File, toFmt: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+
+          if (!ctx) {
+            reject(new Error("Failed to get canvas context"));
+            return;
+          }
+
+          const target = toFmt.toLowerCase();
+          // White background for formats that don't support transparency
+          if (target === 'jpg' || target === 'jpeg' || target === 'bmp' || target === 'ico') {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          ctx.drawImage(img, 0, 0);
+
+          const mimeMap: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'webp': 'image/webp',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'tiff': 'image/tiff',
+            'ico': 'image/png', // ICO not natively supported by canvas, save as PNG
+          };
+
+          const mimeType = mimeMap[target] || 'image/jpeg';
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error("Conversion failed"));
+              }
+            },
+            mimeType,
+            0.92
+          );
+        };
+        img.onerror = () => reject(new Error("Failed to load image for conversion"));
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleConvert = async () => {
@@ -99,149 +188,147 @@ const Convert = () => {
       return;
     }
 
-    // Proceed based on category
+    if (files.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please add files to convert.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setConverting(true);
-    const newConvertedFiles: Map<string, Blob> = new Map();
+    const newConvertedFiles: Map<string, { blob: Blob; originalName: string }> = new Map();
 
     try {
+      const from = fromFormat.toLowerCase();
+      const to = toFormat.toLowerCase();
+
       if (selectedCategory === "images") {
         for (const file of files) {
-          const from = fromFormat.toLowerCase();
-          const to = toFormat.toLowerCase();
           const ext = file.name.split('.').pop()?.toLowerCase() || '';
-          const typeOk = (from === 'jpg' || from === 'jpeg') ? (file.type === 'image/jpeg' || ext === 'jpg' || ext === 'jpeg')
-            : from === 'png' ? (file.type === 'image/png' || ext === 'png')
-            : from === 'webp' ? (file.type === 'image/webp' || ext === 'webp')
-            : from === 'gif' ? (file.type === 'image/gif' || ext === 'gif')
-            : from === 'heic' ? (ext === 'heic')
-            : false;
-          if (!typeOk) {
+          const fromAliases: Record<string, string[]> = {
+            'jpg': ['jpg', 'jpeg'],
+            'jpeg': ['jpg', 'jpeg'],
+            'png': ['png'],
+            'webp': ['webp'],
+            'gif': ['gif'],
+            'bmp': ['bmp'],
+            'tiff': ['tiff', 'tif'],
+            'ico': ['ico'],
+          };
+          const validExts = fromAliases[from] || [from];
+          if (!validExts.includes(ext) && !file.type.includes(from === 'jpg' ? 'jpeg' : from)) {
             toast({ title: 'Mismatched file type', description: `Expected ${fromFormat} file. Skipped: ${file.name}`, variant: 'destructive' });
-            continue;
-          }
-          if (from === 'heic') {
-            toast({ title: 'HEIC not supported', description: 'HEIC decoding is not supported in-browser.', variant: 'destructive' });
             continue;
           }
           try {
             const converted = await convertImage(file, to);
-            newConvertedFiles.set(file.name, converted);
+            newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: converted, originalName: file.name });
           } catch (err) {
-            toast({ title: 'Image conversion failed', description: `Failed: ${file.name}`, variant: 'destructive' });
+            console.error('Image conversion error:', err);
+            toast({ title: 'Conversion failed', description: `Failed to convert: ${file.name}`, variant: 'destructive' });
           }
         }
       } else if (selectedCategory === "documents") {
         for (const file of files) {
-          const from = fromFormat.toLowerCase();
-          const to = toFormat.toLowerCase();
           const ext = file.name.split('.').pop()?.toLowerCase() || '';
-          const typeOk = (from === 'pdf' && (file.type === 'application/pdf' || ext === 'pdf'))
-            || (from === 'docx' && ext === 'docx')
-            || (from === 'xlsx' && ext === 'xlsx')
-            || (from === 'pptx' && ext === 'pptx')
-            || (from === 'csv' && ext === 'csv');
-          if (!typeOk) {
-            toast({ title: 'Mismatched file type', description: `Expected ${fromFormat} file. Skipped: ${file.name}`, variant: 'destructive' });
-            continue;
-          }
-          if (from === 'docx' && to === 'pdf') {
-            const out = await convertDocxToPdf(file);
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'pdf' && to === 'docx') {
-            const out = await convertPdfToDocx(file);
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'pptx' && to === 'pdf') {
-            try {
-              const out = await convertPptxToPdf(file);
-              newConvertedFiles.set(file.name, out);
-            } catch (e) {
-              toast({ title: "PPTX to PDF not supported", description: "This conversion is unavailable client-side.", variant: "destructive" });
+          try {
+            if (from === 'docx' && to === 'pdf') {
+              if (ext !== 'docx') { toast({ title: 'Wrong file type', description: `Expected .docx file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertDocxToPdf(file), originalName: file.name });
+            } else if (from === 'pdf' && to === 'docx') {
+              if (ext !== 'pdf') { toast({ title: 'Wrong file type', description: `Expected .pdf file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertPdfToDocx(file), originalName: file.name });
+            } else if (from === 'pptx' && to === 'pdf') {
+              if (ext !== 'pptx') { toast({ title: 'Wrong file type', description: `Expected .pptx file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertPptxToPdf(file), originalName: file.name });
+            } else if (from === 'xlsx' && to === 'pdf') {
+              if (ext !== 'xlsx') { toast({ title: 'Wrong file type', description: `Expected .xlsx file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertXlsxToPdf(file), originalName: file.name });
+            } else if (from === 'pdf' && (to === 'png' || to === 'jpg')) {
+              if (ext !== 'pdf') { toast({ title: 'Wrong file type', description: `Expected .pdf file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertPdfToImagesZip(file, to as 'png' | 'jpg'), originalName: file.name });
+            } else if (from === 'csv' && to === 'xlsx') {
+              if (ext !== 'csv') { toast({ title: 'Wrong file type', description: `Expected .csv file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertCsvToXlsx(file), originalName: file.name });
+            } else if (from === 'xlsx' && to === 'csv') {
+              if (ext !== 'xlsx') { toast({ title: 'Wrong file type', description: `Expected .xlsx file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertXlsxToCsv(file), originalName: file.name });
+            } else if (from === 'pdf' && to === 'txt') {
+              if (ext !== 'pdf') { toast({ title: 'Wrong file type', description: `Expected .pdf file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertPdfToText(file), originalName: file.name });
+            } else if (from === 'txt' && to === 'pdf') {
+              if (ext !== 'txt') { toast({ title: 'Wrong file type', description: `Expected .txt file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertTextToPdf(file), originalName: file.name });
+            } else if (from === 'docx' && to === 'txt') {
+              if (ext !== 'docx') { toast({ title: 'Wrong file type', description: `Expected .docx file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await convertDocxToText(file), originalName: file.name });
+            } else if (from === 'pdf' && to === 'pdf') {
+              if (ext !== 'pdf') { toast({ title: 'Wrong file type', description: `Expected .pdf file. Skipped: ${file.name}`, variant: 'destructive' }); continue; }
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: await compressPDF(file, 'medium'), originalName: file.name });
+            } else {
+              toast({ title: "Unsupported conversion", description: `${fromFormat} → ${toFormat} is not available yet.`, variant: "destructive" });
             }
-          } else if (from === 'xlsx' && to === 'pdf') {
-            const out = await convertXlsxToPdf(file);
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'pdf' && (to === 'png' || to === 'jpg')) {
-            const out = await convertPdfToImagesZip(file, (to as 'png' | 'jpg'));
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'csv' && to === 'xlsx') {
-            const out = await convertCsvToXlsx(file);
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'xlsx' && to === 'csv') {
-            const out = await convertXlsxToCsv(file);
-            newConvertedFiles.set(file.name, out);
-          } else if (from === 'pdf' && to === 'pdf') {
-            const optimized = await compressPDF(file, 'medium');
-            newConvertedFiles.set(file.name, optimized);
-          } else {
-            toast({ title: "Unsupported pair", description: `${fromFormat} → ${toFormat} is not implemented.`, variant: "destructive" });
+          } catch (err) {
+            console.error('Document conversion error:', err);
+            toast({ title: 'Conversion failed', description: `Failed to convert: ${file.name}. ${err instanceof Error ? err.message : ''}`, variant: 'destructive' });
           }
         }
       } else if (selectedCategory === 'audio') {
         for (const file of files) {
-          const from = fromFormat.toLowerCase();
-          const to = toFormat.toLowerCase();
           const ext = file.name.split('.').pop()?.toLowerCase() || '';
-          const typeOk = (from === 'mp3' && (file.type === 'audio/mpeg' || ext === 'mp3'))
-            || (from === 'wav' && (file.type === 'audio/wav' || ext === 'wav'))
-            || (from === 'm4a' && ext === 'm4a')
-            || (from === 'ogg' && (file.type === 'audio/ogg' || ext === 'ogg'));
-          if (!typeOk) {
-            toast({ title: 'Mismatched file type', description: `Expected ${fromFormat} file. Skipped: ${file.name}`, variant: 'destructive' });
+          const validAudio = ['mp3', 'wav', 'm4a', 'ogg', 'aac'];
+          if (!validAudio.includes(ext)) {
+            toast({ title: 'Wrong file type', description: `Expected audio file. Skipped: ${file.name}`, variant: 'destructive' });
             continue;
           }
           if (to === 'mp3' || to === 'wav') {
             try {
               const out = await convertAudio(file, to as 'mp3' | 'wav');
-              newConvertedFiles.set(file.name, out);
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: out, originalName: file.name });
             } catch (err) {
+              console.error('Audio conversion error:', err);
               toast({ title: 'Audio conversion failed', description: `Failed: ${file.name}`, variant: 'destructive' });
             }
           } else {
-            toast({ title: 'Unsupported pair', description: `${fromFormat} → ${toFormat} is not implemented.`, variant: 'destructive' });
+            toast({ title: 'Unsupported conversion', description: `${fromFormat} → ${toFormat} is not available yet.`, variant: 'destructive' });
           }
         }
       } else if (selectedCategory === 'video') {
         for (const file of files) {
-          const to = toFormat.toLowerCase();
           const ext = file.name.split('.').pop()?.toLowerCase() || '';
-          const typeOk = (ext === 'mp4' || ext === 'mov' || ext === 'avi' || ext === 'webm');
-          if (!typeOk) {
-            toast({ title: 'Mismatched file type', description: `Expected video file. Skipped: ${file.name}`, variant: 'destructive' });
+          const validVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv'];
+          if (!validVideo.includes(ext)) {
+            toast({ title: 'Wrong file type', description: `Expected video file. Skipped: ${file.name}`, variant: 'destructive' });
             continue;
           }
           if (to === 'mp4' || to === 'webm') {
             try {
               const out = await convertVideo(file, to as 'mp4' | 'webm');
-              newConvertedFiles.set(file.name, out);
+              newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: out, originalName: file.name });
             } catch (err) {
+              // Fallback: if MP4 fails, try WebM
               if (to === 'mp4') {
                 try {
                   const out = await convertVideo(file, 'webm');
-                  newConvertedFiles.set(file.name, out);
-                  toast({ title: 'MP4 failed, converted to WEBM', description: `Converted ${file.name} to WEBM`, variant: 'default' });
+                  newConvertedFiles.set(`${file.name}-${Date.now()}`, { blob: out, originalName: file.name });
+                  toast({ title: 'Converted to WebM instead', description: `MP4 encoding unavailable, converted ${file.name} to WebM.` });
                 } catch {
-                  toast({ title: 'Video conversion failed', description: 'This conversion may not be supported in-browser on this device.', variant: 'destructive' });
+                  toast({ title: 'Video conversion failed', description: 'This conversion may not be supported in-browser.', variant: 'destructive' });
                 }
               } else {
-                toast({ title: 'Video conversion failed', description: 'This conversion may not be supported in-browser on this device.', variant: 'destructive' });
+                toast({ title: 'Video conversion failed', description: 'This conversion may not be supported in-browser.', variant: 'destructive' });
               }
             }
           } else {
-            toast({ title: 'Unsupported pair', description: `${fromFormat} → ${toFormat} is not implemented.`, variant: 'destructive' });
+            toast({ title: 'Unsupported conversion', description: `${fromFormat} → ${toFormat} is not available in-browser.`, variant: 'destructive' });
           }
         }
-      } else {
-        toast({
-          title: "Conversion Limited",
-          description: "Unsupported category.",
-          variant: "destructive",
-        });
       }
 
       setConvertedFiles(newConvertedFiles);
-      setConverting(false);
-      
+
       if (newConvertedFiles.size > 0) {
         toast({
           title: "Conversion Complete!",
@@ -249,78 +336,35 @@ const Convert = () => {
         });
       }
     } catch (error) {
-      setConverting(false);
+      console.error('Conversion error:', error);
       toast({
         title: "Conversion Failed",
         description: "An error occurred during conversion.",
         variant: "destructive",
       });
+    } finally {
+      setConverting(false);
     }
   };
 
-  const convertImage = async (file: File, format: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          
-          if (!ctx) {
-            reject(new Error("Failed to get canvas context"));
-            return;
-          }
-
-          const target = format.toLowerCase();
-          if (target === 'jpg' || target === 'jpeg') {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-          ctx.drawImage(img, 0, 0);
-
-          const mimeType =
-            format === "jpg" ? "image/jpeg" :
-            format === "jpeg" ? "image/jpeg" :
-            format === "png" ? "image/png" :
-            format === "webp" ? "image/webp" : "image/jpeg";
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error("Conversion failed"));
-              }
-            },
-            mimeType,
-            0.9
-          );
-        };
-        img.onerror = () => reject(new Error("Failed to load image for conversion"));
-        img.src = e.target?.result as string;
-      };
-
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
+  const getOutputExtension = (): string => {
+    const tf = toFormat.toLowerCase();
+    if (tf === 'jpeg') return 'jpg';
+    // For PDF-to-images, output is a ZIP
+    if (selectedCategory === 'documents' && (tf === 'png' || tf === 'jpg')) return 'zip';
+    return tf;
   };
 
   const handleDownload = (fileName: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const tf = toFormat.toLowerCase();
-    const extImages = tf === "jpeg" ? "jpg" : tf === "jpg" ? "jpg" : tf === "png" ? "png" : tf === "webp" ? "webp" : "jpg";
-    const extDocs = tf === 'pdf' ? 'pdf' : tf === 'docx' ? 'docx' : tf === 'csv' ? 'csv' : tf === 'xlsx' ? 'xlsx' : (tf === 'png' || tf === 'jpg' ? 'zip' : 'pdf');
-    const extAudio = tf === 'mp3' ? 'mp3' : tf === 'wav' ? 'wav' : 'mp3';
-    const extVideo = tf === 'mp4' ? 'mp4' : tf === 'webm' ? 'webm' : 'mp4';
-    const extension = selectedCategory === "documents" ? extDocs : selectedCategory === 'audio' ? extAudio : selectedCategory === 'video' ? extVideo : extImages;
-    a.download = `converted_${fileName.split('.')[0]}.${extension}`;
+    const baseName = fileName.replace(/\.[^.]+$/, '');
+    const ext = getOutputExtension();
+    a.download = `converted_${baseName}.${ext}`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     toast({
@@ -329,30 +373,66 @@ const Convert = () => {
     });
   };
 
+  const handleDownloadAll = async () => {
+    if (convertedFiles.size === 0) return;
+
+    if (convertedFiles.size === 1) {
+      // Single file — download directly
+      const [, entry] = Array.from(convertedFiles.entries())[0];
+      handleDownload(entry.originalName, entry.blob);
+      return;
+    }
+
+    // Multiple files — create ZIP
+    const ext = getOutputExtension();
+    const filesToZip = Array.from(convertedFiles.entries()).map(([, entry]) => ({
+      name: `converted_${entry.originalName.replace(/\.[^.]+$/, '')}.${ext}`,
+      blob: entry.blob,
+    }));
+
+    try {
+      await downloadAsZip(filesToZip);
+      toast({
+        title: "Download started!",
+        description: `Downloading ${filesToZip.length} converted file(s) as ZIP.`,
+      });
+    } catch {
+      toast({
+        title: "Download failed",
+        description: "An error occurred creating the ZIP.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Helmet>
-        <title>Convert Files Online — JPG, PDF, Word, Video & More | Finvestech Tools</title>
-        <meta 
-          name="description" 
-          content="Free online file converter. Convert images, documents, audio, and video files instantly in your browser. No uploads, completely private. Convert JPG, PNG, PDF, MP3, MP4 and more." 
+        <title>Convert Files Online — JPG, PNG, PDF, Word, Excel, Video & More | Finvestech Tools</title>
+        <meta
+          name="description"
+          content="Free online file converter. Convert images (JPG, PNG, WebP, GIF, BMP, TIFF), documents (PDF, Word, Excel, PowerPoint, CSV, TXT), audio (MP3, WAV, OGG), and video files instantly in your browser. No uploads, completely private."
         />
-        <meta name="keywords" content="file converter, image converter, pdf converter, video converter, audio converter, online converter, free converter" />
+        <meta name="keywords" content="file converter, image converter, pdf converter, word to pdf, pdf to word, excel to pdf, video converter, audio converter, jpg to png, png to webp, online converter, free converter, pdf to text, pptx to pdf" />
         <link rel="canonical" href="https://compress.finvestech.in/convert" />
-        
-        {/* Open Graph */}
-        <meta property="og:title" content="Convert Files Online — JPG, PDF, Word, Video & More | Finvestech Tools" />
+
+        <meta property="og:title" content="Convert Files Online — JPG, PNG, PDF, Word, Excel, Video & More | Finvestech Tools" />
         <meta property="og:description" content="Free online file converter. Convert images, documents, audio, and video files instantly in your browser." />
         <meta property="og:url" content="https://compress.finvestech.in/convert" />
         <meta property="og:type" content="website" />
-        
-        {/* Structured Data */}
+        <meta property="og:site_name" content="Finvestech Tools" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Convert Files Online — Images, PDF, Word, Excel, Video | Finvestech Tools" />
+        <meta name="twitter:description" content="Free online file converter. Convert between 20+ formats in your browser. No uploads, 100% private." />
+
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "SoftwareApplication",
             "name": "Finvestech File Converter",
-            "description": "Free online tool to convert images, documents, audio, and video files",
+            "description": "Free online tool to convert images, documents, audio, and video files between formats",
             "url": "https://compress.finvestech.in/convert",
             "applicationCategory": "UtilitiesApplication",
             "operatingSystem": "Web",
@@ -360,14 +440,31 @@ const Convert = () => {
               "@type": "Offer",
               "price": "0",
               "priceCurrency": "USD"
-            }
+            },
+            "featureList": [
+              "Image conversion (JPG, PNG, WebP, GIF, BMP, TIFF, ICO)",
+              "Document conversion (PDF, Word, Excel, PowerPoint, CSV, TXT)",
+              "Audio conversion (MP3, WAV, M4A, OGG, AAC)",
+              "Video conversion (MP4, WebM, MOV, AVI)",
+              "Privacy-focused browser-based processing"
+            ]
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://compress.finvestech.in/" },
+              { "@type": "ListItem", "position": 2, "name": "Convert", "item": "https://compress.finvestech.in/convert" }
+            ]
           })}
         </script>
       </Helmet>
 
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
-        
+
         <main className="flex-1 pt-20">
           {/* Hero Section */}
           <section className="container mx-auto px-4 py-12 md:py-16">
@@ -402,7 +499,13 @@ const Convert = () => {
                     >
                       <Card
                         className="p-6 cursor-pointer hover:shadow-elegant transition-smooth border-2 hover:border-primary"
-                        onClick={() => setSelectedCategory(category.id)}
+                        onClick={() => {
+                          setSelectedCategory(category.id);
+                          setFromFormat("");
+                          setToFormat("");
+                          setFiles([]);
+                          setConvertedFiles(new Map());
+                        }}
                       >
                         <Icon className="w-12 h-12 text-primary mb-4" />
                         <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -441,6 +544,9 @@ const Convert = () => {
                   onClick={() => {
                     setSelectedCategory(null);
                     setFiles([]);
+                    setConvertedFiles(new Map());
+                    setFromFormat("");
+                    setToFormat("");
                   }}
                   className="mb-6"
                 >
@@ -458,8 +564,15 @@ const Convert = () => {
                       category={selectedCategory}
                       fromFormat={fromFormat}
                       toFormat={toFormat}
-                      onFromFormatChange={setFromFormat}
-                      onToFormatChange={setToFormat}
+                      onFromFormatChange={(f) => {
+                        setFromFormat(f);
+                        setToFormat("");
+                        setConvertedFiles(new Map());
+                      }}
+                      onToFormatChange={(t) => {
+                        setToFormat(t);
+                        setConvertedFiles(new Map());
+                      }}
                     />
                   </div>
 
@@ -468,66 +581,86 @@ const Convert = () => {
                     <Alert className="mb-6">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        {selectedCategory === 'video' 
+                        {selectedCategory === 'video'
                           ? 'Best for files under 200MB. Large video conversions may take longer or require more memory.'
                           : 'Best for files under 50MB. Large audio conversions may take longer depending on your device.'}
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  {/* File Upload */}
-                  {files.length === 0 && (
-                    <div className="border-2 border-dashed border-border rounded-xl p-12 text-center hover:border-primary transition-smooth cursor-pointer">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="file-input"
-                        accept={selectedCategory === "images" ? "image/*" : selectedCategory === "documents" ? ".pdf,.docx,.xlsx,.pptx,.csv" : selectedCategory === "audio" ? "audio/*" : selectedCategory === "video" ? "video/*" : "*"}
-                      />
-                      <label htmlFor="file-input" className="cursor-pointer">
-                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                          <ArrowRight className="w-8 h-8 text-primary" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Choose files to convert
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          or drag and drop files here
-                        </p>
-                      </label>
+                  {/* Conversion Info Boxes */}
+                  {selectedCategory === 'documents' && fromFormat && toFormat && (
+                    <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-800 dark:text-blue-300">
+                      {fromFormat === 'PPTX' && toFormat === 'PDF' && (
+                        <>💡 PowerPoint text content will be extracted and formatted as PDF. Complex layouts, images, and animations are not preserved.</>
+                      )}
+                      {fromFormat === 'PDF' && toFormat === 'DOCX' && (
+                        <>💡 Text content from the PDF will be extracted into a Word document. Formatting may vary from the original.</>
+                      )}
+                      {fromFormat === 'PDF' && toFormat === 'TXT' && (
+                        <>💡 All text content will be extracted from the PDF. Formatting and images will not be included.</>
+                      )}
+                      {fromFormat === 'PDF' && (toFormat === 'PNG' || toFormat === 'JPG') && (
+                        <>💡 Each PDF page will be converted to an image and downloaded as a ZIP file.</>
+                      )}
                     </div>
                   )}
+
+                  {/* File Upload */}
+                  <div className="border-2 border-dashed border-border rounded-xl p-12 text-center hover:border-primary transition-smooth cursor-pointer mb-6">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-input"
+                      accept={getAcceptTypes()}
+                    />
+                    <label htmlFor="file-input" className="cursor-pointer">
+                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                        <ArrowRight className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
+                        {files.length > 0 ? 'Add more files' : 'Choose files to convert'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        or drag and drop files here
+                      </p>
+                    </label>
+                  </div>
 
                   {/* File List */}
                   {files.length > 0 && (
                     <div className="space-y-4">
                       {files.map((file, index) => {
-                        const converted = convertedFiles.get(file.name);
+                        // Find the converted entry for this file
+                        const convertedEntry = Array.from(convertedFiles.values()).find(
+                          (entry) => entry.originalName === file.name
+                        );
                         return (
                           <div
-                            key={index}
+                            key={`${file.name}-${index}`}
                             className="flex items-center gap-4 p-4 bg-secondary/50 rounded-xl"
                           >
-                            <div className="flex-1">
-                              <p className="font-medium text-foreground">{file.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground truncate">{file.name}</p>
                               <p className="text-sm text-muted-foreground">
                                 {(file.size / 1024 / 1024).toFixed(2)} MB
-                                {converted && (
-                                  <span className="ml-2 text-primary">
-                                    → {(converted.size / 1024 / 1024).toFixed(2)} MB
+                                {convertedEntry && (
+                                  <span className="ml-2 text-primary font-medium">
+                                    → {(convertedEntry.blob.size / 1024 / 1024).toFixed(2)} MB
                                   </span>
                                 )}
                               </p>
                             </div>
-                            {converted && (
+                            {convertedEntry && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDownload(file.name, converted)}
+                                onClick={() => handleDownload(file.name, convertedEntry.blob)}
+                                className="gap-2 flex-shrink-0"
                               >
-                                <Download className="w-4 h-4 mr-2" />
+                                <Download className="w-4 h-4" />
                                 Download
                               </Button>
                             )}
@@ -535,6 +668,7 @@ const Convert = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRemoveFile(index)}
+                              className="flex-shrink-0"
                             >
                               <X className="w-4 h-4" />
                             </Button>
@@ -545,7 +679,7 @@ const Convert = () => {
                       <div className="flex gap-3 pt-4">
                         <Button
                           onClick={handleConvert}
-                          disabled={converting || !fromFormat || !toFormat || convertedFiles.size > 0}
+                          disabled={converting || !fromFormat || !toFormat || files.length === 0}
                           className="flex-1"
                         >
                           {converting ? (
@@ -554,9 +688,21 @@ const Convert = () => {
                               Converting...
                             </>
                           ) : (
-                            "Convert Files"
+                            `Convert ${files.length} File${files.length > 1 ? 's' : ''}`
                           )}
                         </Button>
+
+                        {convertedFiles.size > 1 && (
+                          <Button
+                            variant="outline"
+                            onClick={handleDownloadAll}
+                            className="gap-2"
+                          >
+                            <Archive className="w-4 h-4" />
+                            Download All
+                          </Button>
+                        )}
+
                         {convertedFiles.size > 0 && (
                           <Button
                             variant="outline"
@@ -564,14 +710,11 @@ const Convert = () => {
                               setFiles([]);
                               setConvertedFiles(new Map());
                             }}
-                            className="flex-1"
                           >
-                            Convert New Files
+                            Clear & Start Over
                           </Button>
                         )}
                       </div>
-                      {/* Ad Gap Placeholder */}
-                      <div className="h-16" />
                     </div>
                   )}
                 </Card>
@@ -579,7 +722,7 @@ const Convert = () => {
                 {/* Info Note */}
                 <div className="mt-6 p-4 bg-muted/30 rounded-xl">
                   <p className="text-sm text-muted-foreground text-center">
-                    💡 Note: Large video conversions might be limited by browser memory. For best results, use files under 50MB.
+                    💡 All conversions happen locally in your browser. No files are uploaded to any server. Your data stays private.
                   </p>
                 </div>
               </motion.div>
@@ -605,7 +748,7 @@ const Convert = () => {
                 <Button
                   size="lg"
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => window.open('https://buymeacoffee.com/zaramehra1z', '_blank')}
+                  onClick={() => window.open('https://buymeacoffee.com/finvestech01', '_blank')}
                 >
                   Buy Me a Coffee
                 </Button>
@@ -620,17 +763,29 @@ const Convert = () => {
                 Why Use Our File Converter?
               </h2>
               <p className="text-muted-foreground mb-6">
-                Whether you need to convert images for email attachments in the US, prepare documents for UK submissions, or optimize media files for Canadian clients, our browser-based converter handles it all without uploading your files to any server. Perfect for professionals who value privacy and speed.
+                Whether you need to convert images for email attachments, prepare documents for submissions, or optimize media files, our browser-based converter handles it all without uploading your files to any server. Perfect for professionals who value privacy and speed.
               </p>
-              
+
               <h3 className="text-xl font-semibold text-foreground mb-3">
                 Supported Conversions
               </h3>
               <ul className="text-muted-foreground space-y-2 mb-6">
-                <li><strong>Images:</strong> Convert between JPG, PNG, WebP, GIF, and HEIC formats for optimal file sizes</li>
-                <li><strong>Documents:</strong> Transform PDFs to Word, Excel to PDF, and PowerPoint to PDF</li>
-                <li><strong>Audio:</strong> Convert MP3, WAV, M4A, and OGG files for compatibility</li>
-                <li><strong>Video:</strong> Change video formats including MP4, MOV, AVI, and WebM</li>
+                <li><strong>Images:</strong> Convert between JPG, PNG, WebP, GIF, BMP, TIFF, and ICO formats</li>
+                <li><strong>Documents:</strong> Word to PDF, PDF to Word, Excel to PDF, PowerPoint to PDF, Excel ↔ CSV, PDF to Text, Text to PDF</li>
+                <li><strong>Audio:</strong> Convert MP3, WAV, M4A, OGG, and AAC files</li>
+                <li><strong>Video:</strong> Convert MP4, MOV, AVI, WebM, and MKV files</li>
+              </ul>
+
+              <h3 className="text-xl font-semibold text-foreground mb-3">
+                Popular Conversions
+              </h3>
+              <ul className="text-muted-foreground space-y-2 mb-6">
+                <li><strong>Word to PDF:</strong> Convert Microsoft Word documents (.docx) to PDF format</li>
+                <li><strong>PDF to Word:</strong> Extract text from PDFs into editable Word documents</li>
+                <li><strong>Excel to PDF:</strong> Convert spreadsheets to professional PDF documents</li>
+                <li><strong>JPG to PNG:</strong> Convert JPEG images to lossless PNG format with transparency</li>
+                <li><strong>PNG to JPG:</strong> Reduce image file size by converting to JPEG</li>
+                <li><strong>PDF to Images:</strong> Convert each PDF page to high-quality PNG or JPG images</li>
               </ul>
 
               <h3 className="text-xl font-semibold text-foreground mb-3">

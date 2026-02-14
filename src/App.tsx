@@ -11,6 +11,12 @@ import Convert from "./pages/Convert";
 import Resize from "./pages/Resize";
 import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
+import Crop from "./pages/Crop";
+import HeicConverter from "./pages/HeicConverter";
+import SvgConverter from "./pages/SvgConverter";
+import PdfMerge from "./pages/PdfMerge";
+import PdfSplit from "./pages/PdfSplit";
+import QrGenerator from "./pages/QrGenerator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +32,12 @@ const App = () => (
           <Route path="/compress" element={<Index />} />
           <Route path="/convert" element={<Convert />} />
           <Route path="/resize" element={<Resize />} />
+          <Route path="/crop" element={<Crop />} />
+          <Route path="/heic-to-jpg" element={<HeicConverter />} />
+          <Route path="/svg-to-png" element={<SvgConverter />} />
+          <Route path="/pdf-merge" element={<PdfMerge />} />
+          <Route path="/pdf-split" element={<PdfSplit />} />
+          <Route path="/qr-generator" element={<QrGenerator />} />
           <Route path="/about" element={<About />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />

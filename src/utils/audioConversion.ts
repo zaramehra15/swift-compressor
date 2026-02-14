@@ -62,29 +62,43 @@ export const audioBufferToWav = (audioBuffer: AudioBuffer): Blob => {
 };
 
 export const audioBufferToMp3 = async (audioBuffer: AudioBuffer, kbps = 192): Promise<Blob> => {
-  type LameModule = { Mp3Encoder: new (channels: number, sampleRate: number, kbps: number) => { encodeBuffer: (left: Int16Array, right: Int16Array) => Uint8Array; flush: () => Uint8Array } };
+  type Mp3Enc = { encodeBuffer: (left: Int16Array, right?: Int16Array) => Uint8Array; flush: () => Uint8Array };
+  type LameModule = { Mp3Encoder: new (channels: number, sampleRate: number, kbps: number) => Mp3Enc };
   const Lame = (await import('lamejs')) as unknown as LameModule;
   const numChannels = Math.min(audioBuffer.numberOfChannels, 2);
   const sampleRate = audioBuffer.sampleRate;
   const left = audioBuffer.getChannelData(0);
-  const right = numChannels > 1 ? audioBuffer.getChannelData(1) : audioBuffer.getChannelData(0);
-  const samples = interleave(left, right);
-  const mp3encoder = new Lame.Mp3Encoder(2, sampleRate, kbps);
+  const mp3encoder = new Lame.Mp3Encoder(numChannels, sampleRate, kbps);
   const maxSamples = 1152;
   const mp3Data: Uint8Array[] = [];
-  let i = 0;
-  while (i < samples.length) {
-    const slice = samples.subarray(i, i + maxSamples * 2);
-    const leftSlice = new Int16Array(maxSamples);
-    const rightSlice = new Int16Array(maxSamples);
-    for (let j = 0, k = 0; j < maxSamples && k < slice.length; j++, k += 2) {
-      leftSlice[j] = Math.max(-32768, Math.min(32767, Math.round(slice[k] * 32767)));
-      rightSlice[j] = Math.max(-32768, Math.min(32767, Math.round(slice[k + 1] * 32767)));
+
+  const toInt16 = (samples: Float32Array): Int16Array => {
+    const out = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
-    const mp3buf = mp3encoder.encodeBuffer(leftSlice, rightSlice);
-    if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf));
-    i += maxSamples * 2;
+    return out;
+  };
+
+  if (numChannels === 1) {
+    // Mono encoding
+    for (let i = 0; i < left.length; i += maxSamples) {
+      const chunk = left.subarray(i, i + maxSamples);
+      const mp3buf = mp3encoder.encodeBuffer(toInt16(chunk));
+      if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf));
+    }
+  } else {
+    // Stereo encoding
+    const right = audioBuffer.getChannelData(1);
+    for (let i = 0; i < left.length; i += maxSamples) {
+      const leftChunk = toInt16(left.subarray(i, i + maxSamples));
+      const rightChunk = toInt16(right.subarray(i, i + maxSamples));
+      const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+      if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf));
+    }
   }
+
   const enc = mp3encoder.flush();
   if (enc.length > 0) mp3Data.push(new Uint8Array(enc));
   return new Blob(mp3Data, { type: 'audio/mpeg' });

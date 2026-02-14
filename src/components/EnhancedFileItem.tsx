@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Download, FileImage, FileText, Loader2, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { compressImageWithWorker, formatFileSize, calculateCompressionRatio } from "@/utils/compressionWorker";
+import { compressImageWithWorker, formatFileSize, calculateCompressionRatio, getExtensionForMime } from "@/utils/compressionWorker";
 import { compressPDF } from "@/utils/pdfCompression";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -21,15 +21,14 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const [originalSize] = useState(file.size);
   const [compressedSize, setCompressedSize] = useState<number>(0);
+  const [outputMime, setOutputMime] = useState<string>(file.type);
   const [thumbnail, setThumbnail] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [lastQuality, setLastQuality] = useState(quality);
   const [lastFormat, setLastFormat] = useState(format);
   const { toast } = useToast();
 
-  // Allow re-compression if quality or format changes
   const canRecompress = compressed && (quality !== lastQuality || format !== lastFormat);
-
   const isImage = file.type.startsWith("image/");
   const isPDF = file.type === "application/pdf";
 
@@ -48,20 +47,22 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
     setCompressing(true);
     setProgress(0);
 
-    // Simulate progress
     const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.min(prev + 10, 90));
-    }, 100);
+      setProgress((prev) => Math.min(prev + 8, 90));
+    }, 150);
 
     try {
       let blob: Blob;
-      
+      let mime = file.type;
+
       if (isImage) {
         const result = await compressImageWithWorker(file, { quality, format });
         blob = result.blob;
+        mime = result.outputMime;
         setCompressedSize(result.compressedSize);
       } else if (isPDF) {
         blob = await compressPDF(file, quality);
+        mime = 'application/pdf';
         setCompressedSize(blob.size);
       } else {
         throw new Error("Unsupported file type");
@@ -71,16 +72,24 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
       setProgress(100);
 
       setCompressedBlob(blob);
+      setOutputMime(mime);
       setCompressed(true);
       setLastQuality(quality);
       setLastFormat(format);
       onCompressed(blob);
 
       const ratio = calculateCompressionRatio(originalSize, blob.size);
-      toast({
-        title: "Compression successful!",
-        description: `Reduced file size by ${ratio}% - Download ready`,
-      });
+      if (ratio <= 0) {
+        toast({
+          title: "File already optimized",
+          description: "This file couldn't be compressed further without losing quality.",
+        });
+      } else {
+        toast({
+          title: "Compression successful!",
+          description: `Reduced file size by ${ratio}% — Download ready`,
+        });
+      }
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Compression error:", error);
@@ -100,7 +109,12 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
     const url = URL.createObjectURL(compressedBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `compressed_${file.name}`;
+
+    // Use correct extension based on the OUTPUT mime type (preserves original format)
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    const ext = getExtensionForMime(outputMime);
+    a.download = `compressed_${baseName}.${ext}`;
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -148,9 +162,10 @@ const EnhancedFileItem = ({ file, quality, format, onRemove, onCompressed }: Enh
             {compressed && (
               <>
                 <span>→</span>
-                <span className="text-primary font-medium flex items-center gap-1">
+                <span className={`font-medium flex items-center gap-1 ${compressionRatio > 0 ? 'text-primary' : 'text-amber-600'}`}>
                   <Check className="w-3 h-3" />
-                  {formatFileSize(compressedSize)} ({compressionRatio}% smaller)
+                  {formatFileSize(compressedSize)}
+                  {compressionRatio > 0 ? ` (${compressionRatio}% smaller)` : ' (already optimized)'}
                 </span>
               </>
             )}
