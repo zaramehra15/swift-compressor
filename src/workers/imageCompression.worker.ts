@@ -5,199 +5,199 @@ interface CompressionMessage {
   format: 'auto' | 'jpeg' | 'webp' | 'png';
 }
 
+/**
+ * Target compression ranges — ratio of original size to KEEP:
+ *   High   → keep 80-90%  (10-20% reduction)
+ *   Medium → keep 50-80%  (20-50% reduction)
+ *   Low    → keep 20-50%  (50-80% reduction)
+ *
+ * Uses binary search to reliably land within range regardless of format.
+ */
+const TARGET_RANGES = {
+  high: { min: 0.80, max: 0.90 },
+  medium: { min: 0.50, max: 0.80 },
+  low: { min: 0.20, max: 0.50 },
+} as const;
+
+// Dimension caps per quality level
+const MAX_DIM = { high: 4096, medium: 3072, low: 2048 } as const;
+
+// Initial quality guesses for JPEG/WebP (starting point for binary search)
+const INITIAL_Q = { high: 0.65, medium: 0.40, low: 0.15 } as const;
+
+// PNG color quantization bit-shift per quality
+const PNG_SHIFT = { high: 0, medium: 2, low: 4 } as const;
+
+// Initial PNG scale starting point
+const PNG_INITIAL_SCALE = { high: 0.95, medium: 0.75, low: 0.50 } as const;
+
+const BINARY_SEARCH_ITERATIONS = 8;
+const MIN_BYTES = 10 * 1024; // Skip files < 10KB
+
+/** Render JPEG/WebP at given quality using OffscreenCanvas */
+async function renderLossy(
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  mime: string,
+  q: number
+): Promise<Blob> {
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d')!;
+  if (mime === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return canvas.convertToBlob({ type: mime, quality: q });
+}
+
+/** Render PNG at given scale + color quantization */
+async function renderPng(
+  bitmap: ImageBitmap,
+  origW: number,
+  origH: number,
+  scale: number,
+  shift: number
+): Promise<Blob> {
+  const w = Math.max(16, Math.round(origW * scale));
+  const h = Math.max(16, Math.round(origH * scale));
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+
+  if (shift > 0) {
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    const mask = (0xFF >> shift) << shift;
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = data[i] & mask;
+      data[i + 1] = data[i + 1] & mask;
+      data[i + 2] = data[i + 2] & mask;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  return canvas.convertToBlob({ type: 'image/png' });
+}
+
 self.onmessage = async (e: MessageEvent<CompressionMessage>) => {
-  const { file, quality, format } = e.data;
+  const { file, quality } = e.data;
 
   try {
-    const targets = {
-      low: { min: 0.80, max: 0.85, initialQ: 0.25 },
-      medium: { min: 0.45, max: 0.50, initialQ: 0.58 },
-      high: { min: 0.20, max: 0.22, initialQ: 0.90 },
-    } as const;
-    const { min: targetMin, max: targetMax, initialQ } = targets[quality];
+    const target = TARGET_RANGES[quality];
 
-    // Minimal compression check: skip tiny files to avoid visual degradation
-    const MIN_BYTES_TO_COMPRESS = 50 * 1024;
-    if (file.size < MIN_BYTES_TO_COMPRESS) {
+    // Skip tiny files
+    if (file.size < MIN_BYTES) {
       self.postMessage({
         success: true,
         blob: file,
         originalSize: file.size,
         compressedSize: file.size,
+        outputMime: file.type,
       });
       return;
     }
 
-    // Read file
     const bitmap = await createImageBitmap(file);
+    let width = bitmap.width;
+    let height = bitmap.height;
 
-    // Keep original dimensions to avoid unintended extra size reduction
-    const width = bitmap.width;
-    const height = bitmap.height;
-
-    // Create canvas
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      throw new Error('Failed to get canvas context');
+    // Determine output MIME — preserve original format
+    let outputMime = file.type || 'image/jpeg';
+    if (outputMime === 'image/jpg') outputMime = 'image/jpeg';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(outputMime)) {
+      outputMime = 'image/jpeg';
     }
 
-    ctx.drawImage(bitmap, 0, 0, width, height);
+    const isPng = outputMime === 'image/png';
+    const maxDim = MAX_DIM[quality];
 
-    let hasAlpha = false;
-    try {
-      const stepX = Math.max(1, Math.floor(width / 50));
-      const stepY = Math.max(1, Math.floor(height / 50));
-      const data = ctx.getImageData(0, 0, width, height).data;
-      for (let y = 0; y < height && !hasAlpha; y += stepY) {
-        for (let x = 0; x < width; x += stepX) {
-          const i = (y * width + x) * 4 + 3;
-          if (data[i] < 255) { hasAlpha = true; break; }
-        }
-      }
-    } catch { hasAlpha = false; }
-
-    // Determine output format
-    let outputFormat: string = 'image/jpeg';
-    if (format === 'webp') {
-      outputFormat = 'image/webp';
-    } else if (format === 'png') {
-      outputFormat = 'image/png';
-    } else if (format === 'auto') {
-      if (file.type === 'image/png') {
-        outputFormat = 'image/webp';
-      } else {
-        outputFormat = 'image/jpeg';
-      }
+    // Apply dimension cap (for all formats)
+    if (Math.max(width, height) > maxDim) {
+      const s = maxDim / Math.max(width, height);
+      width = Math.round(width * s);
+      height = Math.round(height * s);
     }
+    width = Math.max(16, width);
+    height = Math.max(16, height);
 
-    const compressAt = async (q: number, type = outputFormat) => {
-      const qualityParam = type === 'image/png' ? undefined : Math.max(0.1, Math.min(1, q));
-      return await canvas.convertToBlob({
-        type,
-        quality: qualityParam as number | undefined,
-      });
-    };
+    const targetMid = (target.min + target.max) / 2;
+    let bestBlob: Blob;
+    let bestKR: number;
 
-    // If PNG is explicitly requested, browser ignores quality, so just re-encode once
-    if (outputFormat === 'image/png') {
-      const blob = await compressAt(1.0);
-      self.postMessage({
-        success: true,
-        blob,
-        originalSize: file.size,
-        compressedSize: blob.size,
-      });
-      return;
-    }
+    if (!isPng) {
+      // ── JPEG / WebP: binary search on quality parameter ──
+      let lo = 0.01;
+      let hi = 0.95;
 
-    // Iteratively search for a quality that lands within the target reduction range
-    let qLow = 0.1;
-    let qHigh = 1.0;
-    let q: number = Number(initialQ);
+      // Initial attempt
+      bestBlob = await renderLossy(bitmap, width, height, outputMime, INITIAL_Q[quality]);
+      bestKR = bestBlob.size / file.size;
 
-    let bestWithin: { blob: Blob; reduction: number } | null = null;
-    let resultBlob: Blob | null = null;
+      // Only search if not already in range
+      if (bestKR < target.min || bestKR > target.max) {
+        for (let i = 0; i < BINARY_SEARCH_ITERATIONS; i++) {
+          const midQ = (lo + hi) / 2;
+          const blob = await renderLossy(bitmap, width, height, outputMime, midQ);
+          const kr = blob.size / file.size;
 
-    const computeReduction = (size: number) => (file.size - size) / file.size;
-
-    for (let i = 0; i < 10; i++) {
-      const b = await compressAt(q);
-      const reduction = computeReduction(b.size);
-
-      if (reduction >= targetMin && reduction <= targetMax) {
-        resultBlob = b;
-        break;
-      }
-
-      if (reduction <= targetMax) {
-        if (!bestWithin || reduction > bestWithin.reduction) {
-          bestWithin = { blob: b, reduction };
-        }
-      }
-
-      if (reduction > targetMax) {
-        qLow = q;
-      } else {
-        qHigh = q;
-      }
-
-      const nextQ = (qLow + qHigh) / 2;
-      if (Math.abs(nextQ - q) < 0.02) {
-        q = nextQ;
-        const b2 = await compressAt(q);
-        const r2 = computeReduction(b2.size);
-        if (r2 >= targetMin && r2 <= targetMax) {
-          resultBlob = b2;
-        } else if (r2 <= targetMax) {
-          if (!bestWithin || r2 > bestWithin.reduction) bestWithin = { blob: b2, reduction: r2 };
-        }
-        break;
-      }
-      q = nextQ;
-    }
-
-    if (!resultBlob) {
-      let candidate = bestWithin?.blob ?? null;
-      const needAltForHighMedium = (quality === 'high' || quality === 'medium') && (!candidate || (candidate && computeReduction(candidate.size) < targetMin));
-      if (quality === 'low' || needAltForHighMedium) {
-        const altType = outputFormat === 'image/webp' ? 'image/jpeg' : 'image/webp';
-        let qL = 0.1;
-        let qH = 1.0;
-        let q2: number = Number(initialQ);
-        let best2: { blob: Blob; reduction: number } | null = null;
-        for (let i = 0; i < 10; i++) {
-          const b = await compressAt(q2, altType);
-          const r = computeReduction(b.size);
-          if (r >= targetMin && r <= targetMax) { resultBlob = b; break; }
-          if (r <= targetMax) { if (!best2 || r > best2.reduction) best2 = { blob: b, reduction: r }; }
-          if (r > targetMax) { qL = q2; } else { qH = q2; }
-          const nq = (qL + qH) / 2;
-          if (Math.abs(nq - q2) < 0.02) {
-            q2 = nq;
-            const b2 = await compressAt(q2, altType);
-            const r2 = computeReduction(b2.size);
-            if (r2 >= targetMin && r2 <= targetMax) { resultBlob = b2; }
-            else if (r2 <= targetMax) { if (!best2 || r2 > best2.reduction) best2 = { blob: b2, reduction: r2 }; }
-            break;
+          // Track best (closest to target midpoint)
+          if (Math.abs(kr - targetMid) < Math.abs(bestKR - targetMid)) {
+            bestBlob = blob;
+            bestKR = kr;
           }
-          q2 = nq;
-        }
-        if (!resultBlob && best2) {
-          if (!candidate) candidate = best2.blob; else {
-            const candR = computeReduction(candidate.size);
-            if (best2.reduction > candR) candidate = best2.blob;
-          }
-        }
-      }
-      if (!resultBlob) {
-        if (candidate) {
-          resultBlob = candidate;
-        } else {
-          const maxQBlob = await compressAt(1.0);
-          const maxReduction = computeReduction(maxQBlob.size);
-          if (maxReduction > targetMax) {
-            const pngBlob = await compressAt(1.0, 'image/png');
-            resultBlob = pngBlob;
+
+          if (kr >= target.min && kr <= target.max) {
+            break; // In range
+          } else if (kr > target.max) {
+            hi = midQ; // Too large → lower quality
           } else {
-            resultBlob = maxQBlob;
+            lo = midQ; // Too small → higher quality
           }
         }
       }
-      if (computeReduction(resultBlob.size) <= 0) {
-        resultBlob = file;
+    } else {
+      // ── PNG: binary search on scale factor ──
+      let lo = 0.10;
+      let hi = 1.0;
+      const shift = PNG_SHIFT[quality];
+
+      // Initial attempt
+      bestBlob = await renderPng(bitmap, width, height, PNG_INITIAL_SCALE[quality], shift);
+      bestKR = bestBlob.size / file.size;
+
+      if (bestKR < target.min || bestKR > target.max) {
+        for (let i = 0; i < BINARY_SEARCH_ITERATIONS; i++) {
+          const midScale = (lo + hi) / 2;
+          const blob = await renderPng(bitmap, width, height, midScale, shift);
+          const kr = blob.size / file.size;
+
+          if (Math.abs(kr - targetMid) < Math.abs(bestKR - targetMid)) {
+            bestBlob = blob;
+            bestKR = kr;
+          }
+
+          if (kr >= target.min && kr <= target.max) {
+            break;
+          } else if (kr > target.max) {
+            hi = midScale; // Too large → smaller scale
+          } else {
+            lo = midScale; // Too small → larger scale
+          }
+        }
       }
     }
 
-    // Send back result
+    bitmap.close();
+
     self.postMessage({
       success: true,
-      blob: resultBlob,
+      blob: bestBlob,
       originalSize: file.size,
-      compressedSize: resultBlob.size,
+      compressedSize: bestBlob.size,
+      outputMime,
     });
-
   } catch (error) {
     self.postMessage({
       success: false,

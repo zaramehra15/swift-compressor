@@ -3,7 +3,7 @@ import { Coffee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // CONFIGURATION: Replace with your Buy Me a Coffee username
-const BUY_ME_COFFEE_URL = "https://buymeacoffee.com/zaramehra1z";
+const BUY_ME_COFFEE_URL = "https://buymeacoffee.com/finvestech01";
 
 const Footer = () => {
   return (
@@ -25,50 +25,41 @@ const Footer = () => {
               Buy Me a Coffee
             </Button>
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-3">Tools</h4>
               <div className="space-y-2">
-                <Link 
-                  to="/compress" 
-                  className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
-                >
-                  Compress
-                </Link>
-                <Link 
-                  to="/convert" 
-                  className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
-                >
-                  Convert
-                </Link>
-                <Link 
-                  to="/resize" 
-                  className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
-                >
-                  Resize
-                </Link>
+                <Link to="/compress" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Compress</Link>
+                <Link to="/convert" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Convert</Link>
+                <Link to="/resize" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Resize</Link>
+                <Link to="/crop" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Image Cropper</Link>
+                <Link to="/heic-to-jpg" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">HEIC to JPG</Link>
+                <Link to="/svg-to-png" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">SVG to PNG</Link>
+                <Link to="/pdf-merge" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Merge PDF</Link>
+                <Link to="/pdf-split" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">Split PDF</Link>
+                <Link to="/qr-generator" className="block text-sm text-muted-foreground hover:text-primary transition-smooth">QR Generator</Link>
               </div>
             </div>
 
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-3">Company</h4>
               <div className="space-y-2">
-                <Link 
-                  to="/about" 
+                <Link
+                  to="/about"
                   className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   About
                 </Link>
-                <Link 
-                  to="/contact" 
+                <Link
+                  to="/contact"
                   className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   Contact
                 </Link>
-                <a 
-                  href="https://finvestech.in" 
-                  target="_blank" 
+                <a
+                  href="https://finvestech.in"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
@@ -80,14 +71,14 @@ const Footer = () => {
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-3">Legal</h4>
               <div className="space-y-2">
-                <Link 
-                  to="/privacy" 
+                <Link
+                  to="/privacy"
                   className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   Privacy Policy
                 </Link>
-                <Link 
-                  to="/terms" 
+                <Link
+                  to="/terms"
                   className="block text-sm text-muted-foreground hover:text-primary transition-smooth"
                 >
                   Terms of Service

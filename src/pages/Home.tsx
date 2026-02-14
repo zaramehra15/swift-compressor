@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileArchive, RefreshCw, Maximize2, Shield, Zap, Lock, ArrowRight } from "lucide-react";
+import { FileArchive, RefreshCw, Maximize2, Shield, Zap, Lock, ArrowRight, Crop, ImageIcon, FileCode2, Combine, Scissors, QrCode } from "lucide-react";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -32,11 +32,65 @@ const Home = () => {
     {
       id: "resize",
       title: "Resize Images",
-      description: "Resize and crop images for social media, email, and web",
+      description: "Resize images for social media, email, and web",
       icon: Maximize2,
       path: "/resize",
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
+    },
+    {
+      id: "crop",
+      title: "Crop Image",
+      description: "Crop images with preset aspect ratios for any platform",
+      icon: Crop,
+      path: "/crop",
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/10",
+    },
+    {
+      id: "heic-to-jpg",
+      title: "HEIC to JPG",
+      description: "Convert iPhone HEIC photos to JPG or PNG instantly",
+      icon: ImageIcon,
+      path: "/heic-to-jpg",
+      color: "text-pink-500",
+      bgColor: "bg-pink-500/10",
+    },
+    {
+      id: "svg-to-png",
+      title: "SVG to PNG",
+      description: "Convert vector SVG files to high-quality raster images",
+      icon: FileCode2,
+      path: "/svg-to-png",
+      color: "text-teal-500",
+      bgColor: "bg-teal-500/10",
+    },
+    {
+      id: "pdf-merge",
+      title: "Merge PDF",
+      description: "Combine multiple PDF files into a single document",
+      icon: Combine,
+      path: "/pdf-merge",
+      color: "text-red-500",
+      bgColor: "bg-red-500/10",
+    },
+    {
+      id: "pdf-split",
+      title: "Split PDF",
+      description: "Extract specific pages or ranges from any PDF",
+      icon: Scissors,
+      path: "/pdf-split",
+      color: "text-amber-500",
+      bgColor: "bg-amber-500/10",
+    },
+    {
+      id: "qr-generator",
+      title: "QR Generator",
+      description: "Create custom QR codes for URLs, WiFi, contacts, and more",
+      icon: QrCode,
+      path: "/qr-generator",
+      color: "text-indigo-500",
+      bgColor: "bg-indigo-500/10",
     },
   ];
 
@@ -64,22 +118,22 @@ const Home = () => {
         <title>Finvestech Tools – Free Online File Compressor, Converter & Resizer</title>
         <meta
           name="description"
-          content="Compress, convert, and resize images, PDFs, and videos instantly in your browser. 100% private, secure, and free. No uploads required."
+          content="Compress, convert, resize, crop images, convert HEIC to JPG, SVG to PNG, merge & split PDFs, and generate QR codes — all free, private, and browser-based."
         />
         <meta name="keywords" content="file compressor, image converter, photo resizer, pdf compressor, online tools, free tools, privacy tools" />
         <link rel="canonical" href="https://compress.finvestech.in/" />
-        
+
         {/* Open Graph */}
         <meta property="og:title" content="Finvestech Tools – Free Online File Compressor, Converter & Resizer" />
         <meta property="og:description" content="Compress, convert, and resize images, PDFs, and videos instantly in your browser. 100% private, secure, and free." />
         <meta property="og:url" content="https://compress.finvestech.in/" />
         <meta property="og:type" content="website" />
-        
+
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Finvestech Tools – Free Online File Compressor, Converter & Resizer" />
         <meta name="twitter:description" content="Compress, convert, and resize images, PDFs, and videos instantly in your browser." />
-        
+
         {/* Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
@@ -141,7 +195,7 @@ const Home = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.5 }}
-                className="grid md:grid-cols-3 gap-6 mb-12"
+                className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
               >
                 {tools.map((tool, index) => {
                   const Icon = tool.icon;
@@ -303,7 +357,7 @@ const Home = () => {
               <Button
                 size="lg"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => window.open('https://buymeacoffee.com/zaramehra1z', '_blank')}
+                onClick={() => window.open('https://buymeacoffee.com/finvestech01', '_blank', 'noopener,noreferrer')}
               >
                 Buy Me a Coffee
               </Button>

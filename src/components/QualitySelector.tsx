@@ -26,10 +26,9 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
         );
         onQualityChange(isQuality(val) ? val : quality);
       }}>
-        <div 
-          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-            quality === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-          }`}
+        <div
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${quality === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
           onClick={() => onQualityChange('high')}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('high')}
           role="button"
@@ -42,16 +41,15 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               High Quality
             </Label>
             <p className="text-xs text-muted-foreground">
-              Best quality, ~20% smaller
+              Best quality, ~10-20% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'high'))})`}
             </p>
           </div>
         </div>
 
-        <div 
-          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-            quality === 'medium' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-          }`}
+        <div
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${quality === 'medium' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
           onClick={() => onQualityChange('medium')}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('medium')}
           role="button"
@@ -64,16 +62,15 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               Medium Quality (Recommended)
             </Label>
             <p className="text-xs text-muted-foreground">
-              Balanced, ~50% smaller
+              Balanced, ~20-50% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'medium'))})`}
             </p>
           </div>
         </div>
 
-        <div 
-          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-            quality === 'low' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-          }`}
+        <div
+          className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-smooth cursor-pointer ${quality === 'low' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
           onClick={() => onQualityChange('low')}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onQualityChange('low')}
           role="button"
@@ -86,7 +83,7 @@ const QualitySelector = ({ quality, onQualityChange, totalSize }: QualitySelecto
               Low Quality
             </Label>
             <p className="text-xs text-muted-foreground">
-              Maximum compression, ~80%+ smaller
+              Maximum compression, ~50-80% smaller
               {totalSize && ` (≈${formatFileSize(estimateCompressedSize(totalSize, 'low'))})`}
             </p>
           </div>
