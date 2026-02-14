@@ -72,6 +72,8 @@
     "vaul": "^0.9.9",
     "zod": "^3.25.76",
     "lamejs": "^1.2.0",
+    "heic2any": "^0.0.4",
+    "qrcode": "^1.5.4",
     "@ffmpeg/ffmpeg": "^0.12.8",
     "@ffmpeg/core": "^0.12.8"
   },

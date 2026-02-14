@@ -29,7 +29,7 @@ const Index = () => {
   const handleFilesSelected = (newFiles: File[]) => {
     // Check file size limit (50MB)
     const oversizedFiles = newFiles.filter(f => f.size > 50 * 1024 * 1024);
-    
+
     if (oversizedFiles.length > 0) {
       toast({
         title: "File size limit exceeded",
@@ -100,9 +100,67 @@ const Index = () => {
         <title>Compress Images & PDFs Instantly – Free & Private | Finvestech Tools</title>
         <meta
           name="description"
-          content="Fast, private, and free file compressor. Reduce size of images and PDFs without losing quality — works fully in your browser."
+          content="Fast, private, and free file compressor. Reduce size of images and PDFs without losing quality — works fully in your browser. No uploads required."
         />
-        <meta name="keywords" content="compress images, compress PDF, image compressor, PDF compressor, reduce file size, free compressor, online compressor, US, UK, Canada" />
+        <meta name="keywords" content="compress images, compress PDF, image compressor, PDF compressor, reduce file size, free compressor, online image compressor, compress pictures online, reduce image size, shrink PDF file, best free compressor 2025" />
+        <link rel="canonical" href="https://compress.finvestech.in/compress" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Compress Images & PDFs Instantly – Free & Private | Finvestech Tools" />
+        <meta property="og:description" content="Reduce file size of images and PDFs without losing quality. 100% browser-based, no uploads." />
+        <meta property="og:url" content="https://compress.finvestech.in/compress" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Finvestech Tools" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Compress Images & PDFs Instantly | Finvestech Tools" />
+        <meta name="twitter:description" content="Free online image and PDF compressor. No uploads, 100% private." />
+
+        {/* Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "Finvestech Image & PDF Compressor",
+            "description": "Free online tool to compress images and PDF files without losing quality. Works entirely in your browser.",
+            "url": "https://compress.finvestech.in/compress",
+            "applicationCategory": "UtilitiesApplication",
+            "operatingSystem": "Web",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "featureList": [
+              "Image compression (JPG, PNG, WebP)",
+              "PDF compression",
+              "Batch file compression",
+              "Download all as ZIP",
+              "Low/Medium/High quality settings",
+              "100% browser-based, no uploads"
+            ]
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://compress.finvestech.in/" },
+              { "@type": "ListItem", "position": 2, "name": "Compress", "item": "https://compress.finvestech.in/compress" }
+            ]
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to Compress Images and PDFs Online for Free",
+            "description": "Compress your images and PDF files in 3 simple steps using Finvestech Tools — all within your browser.",
+            "step": [
+              { "@type": "HowToStep", "position": 1, "name": "Upload Files", "text": "Drop your images or PDF files, or click to browse from your device" },
+              { "@type": "HowToStep", "position": 2, "name": "Choose Quality", "text": "Select Low, Medium, or High quality compression settings" },
+              { "@type": "HowToStep", "position": 3, "name": "Download", "text": "Download individual files or get all compressed files as a ZIP archive" }
+            ]
+          })}
+        </script>
       </Helmet>
 
       <div className="min-h-screen flex flex-col">
@@ -110,14 +168,14 @@ const Index = () => {
 
         {/* Hero Section */}
         <main className="flex-1 pt-24">
-          <motion.section 
+          <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="gradient-subtle py-20 px-4"
           >
             <div className="container mx-auto text-center max-w-4xl">
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1, duration: 0.5 }}
@@ -127,7 +185,7 @@ const Index = () => {
                 <br />
                 <span className="text-primary">Instantly – 100% Free & Private</span>
               </motion.h1>
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
@@ -180,8 +238,8 @@ const Index = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <QualitySelector 
-                      quality={quality} 
+                    <QualitySelector
+                      quality={quality}
                       onQualityChange={setQuality}
                       totalSize={totalOriginalSize}
                     />
@@ -256,8 +314,8 @@ const Index = () => {
                       <div className="space-y-4">
                         <AnimatePresence>
                           {files.map((file, index) => (
-                            <EnhancedFileItem 
-                              key={`${file.name}-${index}`} 
+                            <EnhancedFileItem
+                              key={`${file.name}-${index}`}
                               file={file}
                               quality={quality}
                               format={format}
@@ -362,7 +420,7 @@ const Index = () => {
                 <Button
                   size="lg"
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => window.open('https://buymeacoffee.com/zaramehra1z', '_blank')}
+                  onClick={() => window.open('https://buymeacoffee.com/finvestech01', '_blank')}
                 >
                   <Gift className="w-5 h-5 mr-2" />
                   Buy Me a Coffee

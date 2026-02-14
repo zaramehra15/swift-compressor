@@ -35,6 +35,22 @@ const FAQSection = () => {
 
   return (
     <section className="py-16 px-4">
+      {/* FAQPage structured data for Google rich snippets */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": faqs.map(faq => ({
+            "@type": "Question",
+            "name": faq.question,
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": faq.answer
+            }
+          }))
+        })
+      }} />
+
       <div className="container mx-auto max-w-3xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-foreground mb-4">

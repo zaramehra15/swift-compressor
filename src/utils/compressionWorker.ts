@@ -7,6 +7,7 @@ export interface CompressionResult {
   blob: Blob;
   originalSize: number;
   compressedSize: number;
+  outputMime: string;
 }
 
 export const compressImageWithWorker = (
@@ -19,196 +20,248 @@ export const compressImageWithWorker = (
       { type: 'module' }
     );
 
-    const QUALITY_TARGETS: Record<CompressionOptions['quality'], { min: number; max: number; q: number }> = {
-      low: { min: 0.80, max: 0.85, q: 0.25 },
-      medium: { min: 0.45, max: 0.50, q: 0.58 },
-      high: { min: 0.20, max: 0.22, q: 0.90 },
-    };
-
-    const getOutputType = (format: CompressionOptions['format'], inputType: string): 'image/jpeg' | 'image/webp' | 'image/png' => {
-      if (format === 'jpeg') return 'image/jpeg';
-      if (format === 'webp') return 'image/webp';
-      if (format === 'png') return 'image/png';
-      return inputType === 'image/png' ? 'image/webp' : 'image/jpeg';
-    };
-
-    const reencodeOnMainThread = async (
-      f: File,
-      format: CompressionOptions['format'],
-      quality: CompressionOptions['quality'],
-      qTarget: number,
-      min: number,
-      max: number
-    ): Promise<CompressionResult> => {
-      const MIN_BYTES_TO_COMPRESS = 50 * 1024;
-      if (f.size < MIN_BYTES_TO_COMPRESS) {
-        return { blob: f, originalSize: f.size, compressedSize: f.size };
-      }
-      const type: 'image/jpeg' | 'image/webp' | 'image/png' = getOutputType(format, f.type);
-
-      const imgUrl = URL.createObjectURL(f);
-      try {
-        const img = await new Promise<HTMLImageElement>((res, rej) => {
-          const el = new Image();
-          el.onload = () => res(el);
-          el.onerror = () => rej(new Error('Failed to load image for compression'));
-          el.src = imgUrl;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Failed to get canvas context');
-        ctx.drawImage(img, 0, 0);
-
-        // Auto already maps PNG → WebP and others → JPEG via getOutputType
-
-        const toBlobWithQ = (qual: number) => new Promise<Blob>((res, rej) => {
-          canvas.toBlob((b) => {
-            if (!b) return rej(new Error('Canvas toBlob failed'));
-            res(b);
-          }, type, Math.max(0.1, Math.min(1, qual)));
-        });
-
-        if (type === 'image/png') {
-          const pngBlob = await new Promise<Blob>((res, rej) => {
-            canvas.toBlob((b) => {
-              if (!b) return rej(new Error('Canvas toBlob failed'));
-              res(b);
-            }, 'image/png');
-          });
-          URL.revokeObjectURL(imgUrl);
-          return { blob: pngBlob, originalSize: f.size, compressedSize: pngBlob.size };
-        }
-        const computeReduction = (size: number) => (f.size - size) / f.size;
-        let q = qTarget;
-        let bestWithin: { blob: Blob; reduction: number } | null = null;
-        let lastBlob: Blob | null = null;
-
-        for (let i = 0; i < 6; i++) {
-          const b = await new Promise<Blob>((res, rej) => {
-            canvas.toBlob((bb) => {
-              if (!bb) return rej(new Error('Canvas toBlob failed'));
-              res(bb);
-            }, type, Math.max(0.1, Math.min(1, q)));
-          });
-          lastBlob = b;
-          const reduction = computeReduction(b.size);
-          if (reduction >= min && reduction <= max) {
-            URL.revokeObjectURL(imgUrl);
-            return { blob: b, originalSize: f.size, compressedSize: b.size };
-          }
-          if (reduction <= max) {
-            if (!bestWithin || reduction > bestWithin.reduction) bestWithin = { blob: b, reduction };
-          }
-          if (reduction > max) {
-            q = Math.min(1, q + 0.12);
-          } else {
-            q = Math.max(0.1, q - 0.12);
-          }
-        }
-        URL.revokeObjectURL(imgUrl);
-        if (bestWithin) {
-          return { blob: bestWithin.blob, originalSize: f.size, compressedSize: bestWithin.blob.size };
-        }
-        const needAltForHighMedium = (quality === 'high' || quality === 'medium') && !bestWithin;
-        if (quality === 'low' || needAltForHighMedium) {
-          const altType: 'image/jpeg' | 'image/webp' = type === 'image/webp' ? 'image/jpeg' : 'image/webp';
-          let qL = 0.1;
-          let qH = 1.0;
-          let q2 = qTarget;
-          let best2: { blob: Blob; reduction: number } | null = null;
-          for (let i = 0; i < 6; i++) {
-            const b = await new Promise<Blob>((res, rej) => {
-              canvas.toBlob((bb) => {
-                if (!bb) return rej(new Error('Canvas toBlob failed'));
-                res(bb);
-              }, altType, Math.max(0.1, Math.min(1, q2)));
-            });
-            const r = computeReduction(b.size);
-            if (r >= min && r <= max) {
-              return { blob: b, originalSize: f.size, compressedSize: b.size };
-            }
-            if (r <= max) { if (!best2 || r > best2.reduction) best2 = { blob: b, reduction: r }; }
-            if (r > max) { qL = q2; } else { qH = q2; }
-            const nq = (qL + qH) / 2;
-            if (Math.abs(nq - q2) < 0.02) {
-              q2 = nq;
-              const b2 = await new Promise<Blob>((res, rej) => {
-                canvas.toBlob((bb) => {
-                  if (!bb) return rej(new Error('Canvas toBlob failed'));
-                  res(bb);
-                }, altType, Math.max(0.1, Math.min(1, q2)));
-              });
-              const r2 = computeReduction(b2.size);
-              if (r2 >= min && r2 <= max) {
-                return { blob: b2, originalSize: f.size, compressedSize: b2.size };
-              }
-              if (r2 <= max) { if (!best2 || r2 > best2.reduction) best2 = { blob: b2, reduction: r2 }; }
-              break;
-            }
-            q2 = nq;
-          }
-          if (best2) {
-            return { blob: best2.blob, originalSize: f.size, compressedSize: best2.blob.size };
-          }
-        }
-        const maxQBlob = await new Promise<Blob>((res, rej) => {
-          canvas.toBlob((bb) => {
-            if (!bb) return rej(new Error('Canvas toBlob failed'));
-            res(bb);
-          }, type, 1.0);
-        });
-        const maxReduction = computeReduction(maxQBlob.size);
-        if (maxReduction > max) {
-          const pngBlob = await new Promise<Blob>((res, rej) => {
-            canvas.toBlob((bb) => {
-              if (!bb) return rej(new Error('Canvas toBlob failed'));
-              res(bb);
-            }, 'image/png');
-          });
-          return { blob: pngBlob, originalSize: f.size, compressedSize: pngBlob.size };
-        }
-        if ((f.size - maxQBlob.size) / f.size <= 0) {
-          return { blob: f, originalSize: f.size, compressedSize: f.size };
-        }
-        return { blob: maxQBlob, originalSize: f.size, compressedSize: maxQBlob.size };
-      } finally {
-        URL.revokeObjectURL(imgUrl);
-      }
-    };
-
     worker.onmessage = async (e) => {
       worker.terminate();
 
       if (e.data.success) {
-        const originalSize = e.data.originalSize as number;
-        const compressedSize = e.data.compressedSize as number;
-        const reduction = (originalSize - compressedSize) / originalSize;
-        const { min, max, q } = QUALITY_TARGETS[options.quality];
-        if (reduction >= min && reduction <= max) {
-          resolve({ blob: e.data.blob, originalSize, compressedSize });
-          return;
+        const result: CompressionResult = {
+          blob: e.data.blob,
+          originalSize: e.data.originalSize,
+          compressedSize: e.data.compressedSize,
+          outputMime: e.data.outputMime || file.type,
+        };
+
+        // If worker compression didn't reduce size enough, try main thread fallback
+        if (result.compressedSize >= result.originalSize * 0.98) {
+          try {
+            const fallback = await compressOnMainThread(file, options);
+            if (fallback.compressedSize < result.compressedSize) {
+              resolve(fallback);
+              return;
+            }
+          } catch {
+            // Use worker result
+          }
         }
+        resolve(result);
+      } else {
+        // Worker failed — try main thread
         try {
-          const fallback = await reencodeOnMainThread(file, options.format, options.quality, q, min, max);
+          const fallback = await compressOnMainThread(file, options);
           resolve(fallback);
         } catch (fallbackErr) {
-          resolve({ blob: e.data.blob, originalSize, compressedSize });
+          reject(new Error(e.data.error || 'Compression failed'));
         }
-      } else {
-        reject(new Error(e.data.error));
       }
     };
 
-    worker.onerror = (error) => {
+    worker.onerror = async (error) => {
       worker.terminate();
-      reject(error);
+      try {
+        const fallback = await compressOnMainThread(file, options);
+        resolve(fallback);
+      } catch {
+        reject(error);
+      }
     };
 
     worker.postMessage({ file, ...options });
   });
+};
+
+/**
+ * Target compression ranges — ratio of original size to KEEP:
+ *   High   → keep 80-90%  (10-20% reduction)
+ *   Medium → keep 50-80%  (20-50% reduction)
+ *   Low    → keep 20-50%  (50-80% reduction)
+ */
+const TARGET_RANGES = {
+  high: { min: 0.80, max: 0.90 },
+  medium: { min: 0.50, max: 0.80 },
+  low: { min: 0.20, max: 0.50 },
+} as const;
+
+const MAX_DIM = { high: 4096, medium: 3072, low: 2048 } as const;
+const INITIAL_Q = { high: 0.65, medium: 0.40, low: 0.15 } as const;
+const PNG_SHIFT = { high: 0, medium: 2, low: 4 } as const;
+const PNG_INITIAL_SCALE = { high: 0.95, medium: 0.75, low: 0.50 } as const;
+const BINARY_SEARCH_ITERATIONS = 8;
+const MIN_BYTES = 10 * 1024;
+
+/** Render JPEG/WebP at given quality using regular canvas */
+function renderLossyCanvas(
+  img: HTMLImageElement,
+  width: number,
+  height: number,
+  mime: string,
+  q: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+
+  if (mime === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return new Promise<Blob>((res, rej) => {
+    canvas.toBlob((b) => {
+      if (!b) return rej(new Error('Canvas toBlob failed'));
+      res(b);
+    }, mime, q);
+  });
+}
+
+/** Render PNG at given scale + color quantization */
+function renderPngCanvas(
+  img: HTMLImageElement,
+  origW: number,
+  origH: number,
+  scale: number,
+  shift: number
+): Promise<Blob> {
+  const w = Math.max(16, Math.round(origW * scale));
+  const h = Math.max(16, Math.round(origH * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  if (shift > 0) {
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    const mask = (0xFF >> shift) << shift;
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = data[i] & mask;
+      data[i + 1] = data[i + 1] & mask;
+      data[i + 2] = data[i + 2] & mask;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  return new Promise<Blob>((res, rej) => {
+    canvas.toBlob((b) => {
+      if (!b) return rej(new Error('Canvas toBlob failed'));
+      res(b);
+    }, 'image/png');
+  });
+}
+
+/**
+ * Main-thread fallback compression. Uses binary search to land within
+ * the target compression range, mirroring the web worker approach.
+ */
+const compressOnMainThread = async (
+  file: File,
+  options: CompressionOptions
+): Promise<CompressionResult> => {
+  const target = TARGET_RANGES[options.quality];
+
+  if (file.size < MIN_BYTES) {
+    return { blob: file, originalSize: file.size, compressedSize: file.size, outputMime: file.type };
+  }
+
+  let outputMime = file.type || 'image/jpeg';
+  if (outputMime === 'image/jpg') outputMime = 'image/jpeg';
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(outputMime)) {
+    outputMime = 'image/jpeg';
+  }
+
+  const isPng = outputMime === 'image/png';
+  const imgUrl = URL.createObjectURL(file);
+
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const el = new Image();
+      el.onload = () => res(el);
+      el.onerror = () => rej(new Error('Failed to load image'));
+      el.src = imgUrl;
+    });
+
+    let width = img.naturalWidth;
+    let height = img.naturalHeight;
+    const maxDim = MAX_DIM[options.quality];
+
+    // Apply dimension cap
+    if (Math.max(width, height) > maxDim) {
+      const s = maxDim / Math.max(width, height);
+      width = Math.round(width * s);
+      height = Math.round(height * s);
+    }
+    width = Math.max(16, width);
+    height = Math.max(16, height);
+
+    const targetMid = (target.min + target.max) / 2;
+    let bestBlob: Blob;
+    let bestKR: number;
+
+    if (!isPng) {
+      // ── JPEG / WebP: binary search on quality ──
+      let lo = 0.01;
+      let hi = 0.95;
+
+      bestBlob = await renderLossyCanvas(img, width, height, outputMime, INITIAL_Q[options.quality]);
+      bestKR = bestBlob.size / file.size;
+
+      if (bestKR < target.min || bestKR > target.max) {
+        for (let i = 0; i < BINARY_SEARCH_ITERATIONS; i++) {
+          const midQ = (lo + hi) / 2;
+          const blob = await renderLossyCanvas(img, width, height, outputMime, midQ);
+          const kr = blob.size / file.size;
+
+          if (Math.abs(kr - targetMid) < Math.abs(bestKR - targetMid)) {
+            bestBlob = blob;
+            bestKR = kr;
+          }
+
+          if (kr >= target.min && kr <= target.max) {
+            break;
+          } else if (kr > target.max) {
+            hi = midQ;
+          } else {
+            lo = midQ;
+          }
+        }
+      }
+    } else {
+      // ── PNG: binary search on scale factor ──
+      let lo = 0.10;
+      let hi = 1.0;
+      const shift = PNG_SHIFT[options.quality];
+
+      bestBlob = await renderPngCanvas(img, width, height, PNG_INITIAL_SCALE[options.quality], shift);
+      bestKR = bestBlob.size / file.size;
+
+      if (bestKR < target.min || bestKR > target.max) {
+        for (let i = 0; i < BINARY_SEARCH_ITERATIONS; i++) {
+          const midScale = (lo + hi) / 2;
+          const blob = await renderPngCanvas(img, width, height, midScale, shift);
+          const kr = blob.size / file.size;
+
+          if (Math.abs(kr - targetMid) < Math.abs(bestKR - targetMid)) {
+            bestBlob = blob;
+            bestKR = kr;
+          }
+
+          if (kr >= target.min && kr <= target.max) {
+            break;
+          } else if (kr > target.max) {
+            hi = midScale;
+          } else {
+            lo = midScale;
+          }
+        }
+      }
+    }
+
+    return { blob: bestBlob, originalSize: file.size, compressedSize: bestBlob.size, outputMime };
+  } finally {
+    URL.revokeObjectURL(imgUrl);
+  }
 };
 
 export const formatFileSize = (bytes: number): string => {
@@ -223,6 +276,7 @@ export const calculateCompressionRatio = (
   originalSize: number,
   compressedSize: number
 ): number => {
+  if (originalSize === 0) return 0;
   return Math.round(((originalSize - compressedSize) / originalSize) * 100);
 };
 
@@ -230,10 +284,28 @@ export const estimateCompressedSize = (
   originalSize: number,
   quality: 'low' | 'medium' | 'high'
 ): number => {
+  // Midpoint of each target range
   const keepMap = {
-    high: 0.80,
-    medium: 0.50,
-    low: 0.35,
+    high: 0.85,   // keeps ~85% → ~15% reduction
+    medium: 0.65, // keeps ~65% → ~35% reduction
+    low: 0.35,    // keeps ~35% → ~65% reduction
   };
   return Math.round(originalSize * keepMap[quality]);
+};
+
+/**
+ * Get the correct file extension for a MIME type
+ */
+export const getExtensionForMime = (mime: string): string => {
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/tiff': 'tiff',
+    'image/svg+xml': 'svg',
+    'application/pdf': 'pdf',
+  };
+  return map[mime] || 'bin';
 };
